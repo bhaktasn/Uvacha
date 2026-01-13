@@ -71,7 +71,6 @@ export async function POST(req: Request) {
 
     const upload = await muxVideo.uploads.create({
       cors_origin: corsOrigin,
-      passthrough,
       new_asset_settings: {
         passthrough,
         playback_policy: ['public'],

@@ -61,7 +61,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ status: 'errored', error: upload.error?.message ?? 'Upload failed' }, { status: 400 })
     }
 
-    const passthroughRaw = upload.passthrough ?? upload.new_asset_settings?.passthrough ?? null
+    const passthroughRaw = upload.new_asset_settings?.passthrough ?? null
     const passthrough = parsePassthrough(passthroughRaw)
 
     if (!passthrough || passthrough.profileId !== user.id) {

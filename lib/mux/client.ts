@@ -1,6 +1,6 @@
-import Mux, { Video } from '@mux/mux-node'
+import Mux from '@mux/mux-node'
 
-let muxVideoClient: Video | null = null
+let muxVideoClient: Mux['video'] | null = null
 
 function assertMuxEnv(name: string, value: string | undefined): string {
   if (!value) {
@@ -9,7 +9,7 @@ function assertMuxEnv(name: string, value: string | undefined): string {
   return value
 }
 
-export function getMuxVideoClient(): Video {
+export function getMuxVideoClient(): Mux['video'] {
   if (muxVideoClient) {
     return muxVideoClient
   }
