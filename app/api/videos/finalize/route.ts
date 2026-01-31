@@ -7,6 +7,7 @@ interface PassthroughPayload {
   profileId: string
   title: string
   description: string
+  prompt: string | null
   generationSource: 'ai' | 'human'
   unlockAt: string
 }
@@ -19,6 +20,7 @@ function parsePassthrough(value?: string | null): PassthroughPayload | null {
       profileId: parsed.profileId,
       title: parsed.title,
       description: parsed.description,
+      prompt: parsed.prompt ?? null,
       generationSource: parsed.generationSource === 'ai' ? 'ai' : 'human',
       unlockAt: parsed.unlockAt,
     }
@@ -101,6 +103,7 @@ export async function POST(req: Request) {
         profile_id: user.id,
         title: passthrough.title,
         description: passthrough.description,
+        prompt: passthrough.prompt,
         generation_source: passthrough.generationSource,
         mux_asset_id: asset.id,
         mux_playback_id: playbackId,

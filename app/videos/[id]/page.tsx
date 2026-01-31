@@ -1,13 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { TipCreatorButton } from "@/components/TipCreatorButton";
+import { UserAvatar } from "@/components/UserAvatar";
 import { VideoComments } from "@/components/VideoComments";
+import { VideoPromptDropdown } from "@/components/VideoPromptDropdown";
 import { VideoRatingPanel } from "@/components/VideoRatingPanel";
 import { VideoViewCount } from "@/components/VideoViewCount";
 import { VideoWatchPlayer } from "@/components/VideoWatchPlayer";
 import { getMuxThumbnailUrl } from "@/lib/mux/thumbnails";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getViewerId } from "@/lib/supabase/viewer";
+import { isValidUSDCAddress } from "@/lib/utils/wallet-validation";
 import { getVideoRatingSummary, getViewerVideoRating } from "@/lib/video-ratings";
 import type { Database } from "@/lib/types/database";
 
@@ -15,7 +19,7 @@ type VideoRow = Database["public"]["Tables"]["videos"]["Row"];
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 
 type VideoWithProfile = VideoRow & {
-  profiles: Pick<ProfileRow, "username"> | null;
+  profiles: Pick<ProfileRow, "username" | "usdc_wallet_address" | "avatar_url"> | null;
 };
 type RawVideoWithProfile = Omit<VideoWithProfile, "profiles"> & {
   profiles: VideoWithProfile["profiles"] | VideoWithProfile["profiles"][] | null;
@@ -44,7 +48,7 @@ async function fetchVideo(videoId: string): Promise<VideoWithProfile | null> {
     const { data, error } = await supabase
       .from("videos")
       .select(
-        "id,profile_id,title,description,generation_source,mux_asset_id,mux_playback_id,view_count,unlock_at,created_at,profiles:profiles!videos_profile_id_fkey(username)"
+        "id,profile_id,title,description,prompt,generation_source,mux_asset_id,mux_playback_id,view_count,unlock_at,created_at,profiles:profiles!videos_profile_id_fkey(username,usdc_wallet_address,avatar_url)"
       )
       .eq("id", videoId)
       .maybeSingle();
@@ -90,6 +94,10 @@ export default async function VideoDetailPage({ params }: VideoPageProps) {
   const isUnlocked = new Date(video.unlock_at) <= new Date();
   const canView = isUnlocked || viewerId === video.profile_id;
   const playbackId = video.mux_playback_id ?? null;
+  
+  // Check if creator has a valid USDC address for tipping
+  const creatorWalletAddress = video.profiles?.usdc_wallet_address ?? null;
+  const canTip = creatorWalletAddress && isValidUSDCAddress(creatorWalletAddress);
   const thumbnailUrl = getMuxThumbnailUrl(video.mux_playback_id, {
     width: 1280,
     height: 720,
@@ -167,6 +175,8 @@ export default async function VideoDetailPage({ params }: VideoPageProps) {
                 </span>
               </div>
 
+              <VideoPromptDropdown prompt={video.prompt} />
+
               <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-white/70">
                 <VideoViewCount videoId={video.id} initialCount={video.view_count ?? 0} />
                 <span className="text-white/35">•</span>
@@ -185,12 +195,33 @@ export default async function VideoDetailPage({ params }: VideoPageProps) {
           <aside className="w-full max-w-sm space-y-4">
             <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_25px_90px_rgba(0,0,0,0.5)] backdrop-blur-xl">
               <p className="text-xs uppercase tracking-[0.35em] text-white/50">Creator</p>
-              <p className="mt-3 text-2xl font-semibold text-white">
-                {formatCreatorHandle(video.profiles?.username)}
-              </p>
-              <p className="mt-2 text-sm text-white/65">
+              <Link 
+                href={video.profiles?.username ? `/u/${video.profiles.username}` : '#'}
+                className="mt-3 flex items-center gap-4 group"
+              >
+                <UserAvatar
+                  avatarUrl={video.profiles?.avatar_url}
+                  username={video.profiles?.username}
+                  size="lg"
+                />
+                <div>
+                  <p className="text-xl font-semibold text-white group-hover:text-[#f5d67b] transition">
+                    {formatCreatorHandle(video.profiles?.username)}
+                  </p>
+                  <p className="text-sm text-white/50">View profile →</p>
+                </div>
+              </Link>
+              <p className="mt-4 text-sm text-white/65">
                 Stream the latest drop and share feedback to keep the momentum going.
               </p>
+              {canTip && (
+                <div className="mt-4 pt-4 border-t border-white/10">
+                  <TipCreatorButton 
+                    creatorAddress={creatorWalletAddress} 
+                    creatorUsername={video.profiles?.username}
+                  />
+                </div>
+              )}
             </div>
             <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_25px_90px_rgba(0,0,0,0.5)] backdrop-blur-xl">
               <p className="text-xs uppercase tracking-[0.35em] text-white/50">Release window</p>

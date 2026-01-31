@@ -103,6 +103,7 @@ export default function VideosPage() {
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
+    prompt: '',
     generationSource: 'human' as 'ai' | 'human',
     unlockAt: defaultUnlockAtValue(),
   })
@@ -112,6 +113,7 @@ export default function VideosPage() {
   const [form, setForm] = useState({
     title: '',
     description: '',
+    prompt: '',
     generationSource: 'human' as 'ai' | 'human',
     unlockAt: initialUnlockAtRef.current,
   })
@@ -214,6 +216,7 @@ export default function VideosPage() {
     setForm({
       title: '',
       description: '',
+      prompt: '',
       generationSource: 'human',
       unlockAt: defaultUnlockAtValue(),
     })
@@ -262,6 +265,7 @@ export default function VideosPage() {
         body: JSON.stringify({
           title: form.title,
           description: form.description,
+          prompt: form.prompt || null,
           generationSource: form.generationSource,
           unlockAt: unlockAtISO,
         }),
@@ -305,6 +309,7 @@ export default function VideosPage() {
     setEditForm({
       title: video.title,
       description: video.description,
+      prompt: video.prompt ?? '',
       generationSource: video.generation_source,
       unlockAt: isoStringToDateInput(video.unlock_at),
     })
@@ -328,6 +333,7 @@ export default function VideosPage() {
     setEditForm({
       title: '',
       description: '',
+      prompt: '',
       generationSource: 'human',
       unlockAt: defaultUnlockAtValue(),
     })
@@ -354,6 +360,7 @@ export default function VideosPage() {
         .update({
           title: editForm.title,
           description: editForm.description,
+          prompt: editForm.prompt || null,
           generation_source: editForm.generationSource,
           unlock_at: unlockAtISO,
           updated_at: new Date().toISOString(),
@@ -612,6 +619,22 @@ export default function VideosPage() {
               <p className="mt-2 text-xs text-white/40">{form.description.length}/5000 characters</p>
             </div>
 
+            <div>
+              <label className="text-xs uppercase tracking-[0.4em] text-white/60">AI Prompt (optional)</label>
+              <textarea
+                name="prompt"
+                value={form.prompt}
+                onChange={handleInputChange}
+                maxLength={10000}
+                rows={4}
+                className={`${fieldClass} min-h-[140px]`}
+                placeholder="Share the prompts you used to generate this video..."
+              />
+              <p className="mt-2 text-xs text-white/40">
+                {form.prompt.length}/10000 characters — Let others learn from your generation process
+              </p>
+            </div>
+
             <div className="grid gap-6 md:grid-cols-2">
               <div>
                 <label className="text-xs uppercase tracking-[0.4em] text-white/60">Unlock at</label>
@@ -843,6 +866,22 @@ export default function VideosPage() {
                     className={`${fieldClass} min-h-[140px]`}
                   />
                   <p className="mt-2 text-xs text-white/40">{editForm.description.length}/5000 characters</p>
+                </div>
+
+                <div>
+                  <label className="text-xs uppercase tracking-[0.4em] text-white/60">AI Prompt (optional)</label>
+                  <textarea
+                    name="prompt"
+                    value={editForm.prompt}
+                    onChange={handleEditInputChange}
+                    maxLength={10000}
+                    rows={4}
+                    className={`${fieldClass} min-h-[140px]`}
+                    placeholder="Share the prompts you used to generate this video..."
+                  />
+                  <p className="mt-2 text-xs text-white/40">
+                    {editForm.prompt.length}/10000 characters — Let others learn from your generation process
+                  </p>
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-2">

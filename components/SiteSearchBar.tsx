@@ -85,14 +85,14 @@ export default function SiteSearchBar({ className, showShortcutHint = false }: S
     <div className={className}>
       <form
         onSubmit={handleSubmit}
-        className={`group relative flex w-full max-w-2xl items-center rounded-full border ${
+        className={`group relative flex w-full items-center rounded-full border ${
           isFocused ? 'border-[#f5d67b]/80' : 'border-white/15'
-        } bg-white/5 px-5 text-white shadow-[0_20px_60px_rgba(0,0,0,0.35)] transition focus-within:border-[#f5d67b]/80 focus-within:bg-white/10`}
+        } bg-white/5 px-2 sm:px-3 md:px-5 text-white shadow-[0_20px_60px_rgba(0,0,0,0.35)] transition focus-within:border-[#f5d67b]/80 focus-within:bg-white/10`}
       >
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"
-          className="h-5 w-5 text-white/50"
+          className="h-4 w-4 sm:h-5 sm:w-5 shrink-0 text-white/50"
           stroke="currentColor"
           strokeWidth={1.6}
           fill="none"
@@ -107,8 +107,8 @@ export default function SiteSearchBar({ className, showShortcutHint = false }: S
           onChange={(event) => setQuery(event.target.value)}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          placeholder="Search videos, creators, descriptions..."
-          className="ml-3 w-full bg-transparent py-3 text-sm text-white placeholder-white/50 focus:outline-none"
+          placeholder="Search..."
+          className="ml-2 sm:ml-3 w-full min-w-0 bg-transparent py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm text-white placeholder-white/50 focus:outline-none"
           aria-label="Search videos"
           aria-keyshortcuts="Control+K Meta+K /"
         />
@@ -116,10 +116,10 @@ export default function SiteSearchBar({ className, showShortcutHint = false }: S
           <button
             type="button"
             onClick={handleClear}
-            className="mr-3 rounded-full p-1 text-white/50 transition hover:text-white"
+            className="mr-1 sm:mr-2 md:mr-3 rounded-full p-0.5 sm:p-1 text-white/50 transition hover:text-white shrink-0"
             aria-label="Clear search"
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" stroke="currentColor" strokeWidth={1.6} fill="none">
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 sm:h-4 sm:w-4" stroke="currentColor" strokeWidth={1.6} fill="none">
               <path d="M6 6l12 12M6 18L18 6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
@@ -127,9 +127,9 @@ export default function SiteSearchBar({ className, showShortcutHint = false }: S
         <button
           type="submit"
           aria-label="Search videos"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#f5d67b]/90 text-black transition hover:bg-[#ffe8a0]"
+          className="inline-flex h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 shrink-0 items-center justify-center rounded-full bg-[#d4a84b] text-[#1a1100] transition hover:bg-[#e6be5c]"
         >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" stroke="currentColor" strokeWidth={1.8} fill="none">
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 sm:h-4 sm:w-4" stroke="currentColor" strokeWidth={1.8} fill="none">
             <circle cx="11" cy="11" r="6.5" />
             <path d="m16 16 4 4" strokeLinecap="round" />
           </svg>

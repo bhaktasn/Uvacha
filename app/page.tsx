@@ -1,9 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
 
-import HeroCover from "@/app/assets/Cover Image-1.jpg";
-import Glyph from "@/app/assets/Icon Transparency-1.png";
-import { getMuxThumbnailUrl } from "@/lib/mux/thumbnails";
+import { VideoCard } from "@/components/VideoCard";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/types/database";
 
@@ -13,7 +10,7 @@ type VideoPreview = Pick<
   VideoRow,
   "id" | "title" | "created_at" | "generation_source" | "mux_playback_id"
 > & {
-  profiles: Pick<ProfileRow, "username"> | null;
+  profiles: Pick<ProfileRow, "username" | "avatar_url"> | null;
 };
 type RawVideoPreview = Omit<VideoPreview, "profiles"> & {
   profiles: VideoPreview["profiles"] | VideoPreview["profiles"][] | null;
@@ -21,54 +18,45 @@ type RawVideoPreview = Omit<VideoPreview, "profiles"> & {
 
 export const revalidate = 60;
 
-const features = [
+const pillars = [
   {
-    title: "Wallet-perfect onboarding",
+    title: "Daily Battles",
     description:
-      "Capture USDC wallets with instant multi-chain validation so every drop routes funds safely.",
-    tag: "Finance Ops",
+      "Every 24 hours, a new arena. Submit your best AI-generated video and let the community decide if it's art or slop.",
+    icon: "⚔️",
   },
   {
-    title: "MUX-native video releases",
+    title: "Community Curators",
     description:
-      "Direct upload sessions, background processing, and unlock scheduling keep premieres cinematic.",
-    tag: "Video",
+      "No algorithms, no gatekeepers. Real humans rate every video on a 0-5 scale—💩 slop to 🤌 certified art.",
+    icon: "👁️",
   },
   {
-    title: "Social proof baked in",
+    title: "USDC Rewards",
     description:
-      "Normalize Twitter/X & Instagram handles to make every profile linkable from day one.",
-    tag: "Community",
+      "Top-rated videos of the day split the daily prize pool. Create art, get paid. Simple as that.",
+    icon: "💰",
   },
   {
-    title: "Human vs AI tracking",
+    title: "Prompt Sharing",
     description:
-      "Label each asset by its generation source to communicate authenticity in a single glance.",
-    tag: "Transparency",
+      "Learn from the best. Creators share their prompts, techniques, and workflows. Tip them if their secrets helped you level up.",
+    icon: "🔓",
   },
 ] as const;
 
 const stats = [
-  { label: "Creator setup", value: "5 min" },
-  { label: "Wallet accuracy", value: "99.9%" },
-  { label: "Scheduled drops", value: "24/7" },
+  { label: "Daily prize", value: "USDC" },
+  { label: "Rating scale", value: "0→5" },
+  { label: "Competition", value: "24h" },
 ] as const;
 
-const workflow = [
-  "Create an account or sign in securely.",
-  "Store socials + wallets once—reuse across every release.",
-  "Upload to MUX, choose AI or human credits, schedule the unlock.",
-  "Share playback URLs when the countdown hits zero.",
+const manifesto = [
+  "2026 is the year of the Slopacolypse.",
+  "AI video tools flood every platform with noise.",
+  "Uvacha is the antidote—a daily arena where art rises and slop gets labeled.",
+  "Join the resistance. Create something worth watching.",
 ] as const;
-
-const uploadDateFormatter = new Intl.DateTimeFormat(undefined, {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-});
-
-const formatCreatorHandle = (username?: string | null) =>
-  username ? `@${username}` : "Unknown creator";
 
 async function fetchLatestVideos(): Promise<VideoPreview[]> {
   try {
@@ -76,7 +64,7 @@ async function fetchLatestVideos(): Promise<VideoPreview[]> {
     const { data, error } = await supabase
       .from("videos")
       .select(
-        "id,title,created_at,generation_source,mux_playback_id,profiles:profiles!videos_profile_id_fkey(username)"
+        "id,title,created_at,generation_source,mux_playback_id,profiles:profiles!videos_profile_id_fkey(username,avatar_url)"
       )
       .lte("unlock_at", new Date().toISOString())
       .order("created_at", { ascending: false })
@@ -115,49 +103,16 @@ export default async function Home() {
           {hasVideos ? (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {latestVideos.map((video) => (
-                <Link
+                <VideoCard
                   key={video.id}
-                  href={`/videos/${video.id}`}
-                  className="group flex flex-col rounded-3xl border border-white/10 bg-white/[0.03] p-4 shadow-[0_25px_80px_rgba(0,0,0,0.45)] transition duration-200 hover:-translate-y-1 hover:border-[#f5d67b]/60"
-                >
-                  <div className="relative overflow-hidden rounded-2xl border border-white/10">
-                    {video.mux_playback_id ? (
-                      <div className="relative aspect-video w-full">
-                        <Image
-                          src={
-                            getMuxThumbnailUrl(video.mux_playback_id, {
-                              width: 640,
-                              height: 360,
-                              time: 2,
-                            })!
-                          }
-                          alt={`Preview for ${video.title}`}
-                          fill
-                          sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                          className="object-cover transition duration-300 group-hover:scale-[1.03]"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                      </div>
-                    ) : (
-                      <div className="aspect-video w-full bg-[radial-gradient(circle_at_top,_rgba(245,214,123,0.25),_transparent_55%)] transition duration-200 group-hover:scale-[1.02]" />
-                    )}
-                    <span className="absolute bottom-3 left-0 flex items-center gap-2 rounded-r-full bg-black/70 px-4 py-1 text-xs uppercase tracking-[0.4em] text-white/80">
-                      {video.generation_source === "ai" ? "AI" : "Human"}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 flex flex-1 flex-col gap-2">
-                    <h3 className="text-lg font-semibold text-white">
-                      {video.title}
-                    </h3>
-                    <p className="text-sm text-white/60">
-                      {formatCreatorHandle(video.profiles?.username)}
-                    </p>
-                    <p className="mt-auto text-xs uppercase tracking-[0.4em] text-white/40">
-                      {uploadDateFormatter.format(new Date(video.created_at))}
-                    </p>
-                  </div>
-                </Link>
+                  id={video.id}
+                  title={video.title}
+                  createdAt={video.created_at}
+                  generationSource={video.generation_source}
+                  muxPlaybackId={video.mux_playback_id}
+                  creatorUsername={video.profiles?.username ?? null}
+                  creatorAvatarUrl={video.profiles?.avatar_url}
+                />
               ))}
             </div>
           ) : (
@@ -169,125 +124,141 @@ export default async function Home() {
         </div>
       </section>
 
-      <div className="mx-auto flex max-w-6xl flex-col gap-16 px-6 pb-24 pt-16 lg:flex-row lg:items-center">
-        <div className="flex-1 space-y-8">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-[#f5d67b]">
-            Launch // Stream // Repeat
-          </span>
-
-          <div className="space-y-6">
-            <h1 className="text-4xl font-semibold leading-tight text-white sm:text-5xl lg:text-6xl">
-              A black & gold cockpit for every creator drop.
-            </h1>
-            <p className="text-lg text-white/70 sm:text-xl">
-              Uvacha merges secure onboarding, MUX-powered distribution, and tasteful brand
-              tooling into one minimal control room. Plan a release once—reuse the rails forever.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-4">
-            <Link
-              href="/signup"
-              className="inline-flex items-center justify-center rounded-full border border-[#f5d67b] bg-[#f5d67b] px-8 py-3 text-sm font-semibold uppercase tracking-[0.25em] text-black shadow-[0_20px_45px_rgba(245,214,123,0.35)] transition hover:-translate-y-0.5 hover:bg-[#ffe8a0]"
-            >
-              Get started
-            </Link>
-            <Link
-              href="/videos"
-              className="inline-flex items-center justify-center rounded-full border border-white/15 px-8 py-3 text-sm font-semibold uppercase tracking-[0.25em] text-white/80 transition hover:border-[#f5d67b]/60 hover:text-white"
-            >
-              Browse the stack
-            </Link>
-          </div>
-
-          <div className="grid gap-6 sm:grid-cols-3">
-            {stats.map((stat) => (
-              <div
-                key={stat.label}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4 shadow-[0_10px_40px_rgba(0,0,0,0.35)]"
-              >
-                <p className="text-3xl font-semibold text-[#f5d67b]">{stat.value}</p>
-                <p className="text-xs uppercase tracking-[0.4em] text-white/60">{stat.label}</p>
-              </div>
-            ))}
-          </div>
+      {/* The Manifesto Section */}
+      <section className="relative mx-auto max-w-6xl px-6 pb-16 pt-20">
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-red-900/20 via-orange-900/10 to-transparent blur-[100px]" />
         </div>
 
-        <div className="flex-1">
-          <div className="relative rounded-[2.5rem] border border-white/10 bg-[#090909]/70 p-6 shadow-[0_30px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl">
-            <div className="absolute -top-6 right-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs uppercase tracking-[0.3em] text-white/65">
-              <Image src={Glyph} alt="Uvacha icon" width={20} height={20} className="opacity-80" />
-              Live
+        <div className="relative overflow-hidden rounded-[3rem] border border-white/5 bg-gradient-to-br from-black/80 via-black/60 to-red-950/20 p-1">
+          <div className="rounded-[2.75rem] bg-gradient-to-br from-[#0a0a0a] to-[#0f0808] p-8 sm:p-12 lg:p-16">
+            <div className="mb-12 flex items-center gap-4">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-red-500/50 to-transparent" />
+              <span className="font-mono text-xs uppercase tracking-[0.5em] text-red-400/80">
+                ⚠️ The Slopacolypse is here
+              </span>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-red-500/50 to-transparent" />
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-black/60 p-4">
-              <Image
-                src={HeroCover}
-                alt="Creator uploading to Uvacha"
-                className="h-72 w-full rounded-2xl object-cover"
-                priority
-              />
+            <div className="mx-auto max-w-3xl space-y-8 text-center">
+              <h2 className="text-3xl font-bold leading-tight text-white sm:text-4xl lg:text-5xl">
+                <span className="bg-gradient-to-r from-white via-white to-white/60 bg-clip-text text-transparent">
+                  AI video is flooding every platform.
+                </span>
+                <br />
+                <span className="bg-gradient-to-r from-[#f5d67b] to-[#ff9d4d] bg-clip-text text-transparent">
+                  Most of it is slop.
+                </span>
+              </h2>
+
+              <p className="text-lg leading-relaxed text-white/60 sm:text-xl">
+                Andrej Karpathy called it—2026 is the year of the Slopacolypse. Every scroll is 
+                drowning in AI-generated noise. But buried in the flood? Real art. Real vision. 
+                Real creativity waiting to be discovered.
+              </p>
+
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#f5d67b]/30 bg-[#f5d67b]/10 px-6 py-2">
+                <span className="text-2xl">🤌</span>
+                <span className="font-semibold text-[#f5d67b]">Uvacha separates art from slop.</span>
+              </div>
             </div>
 
-            <div className="mt-6 grid gap-4 text-sm">
-              {workflow.map((step, index) => (
+            <div className="mt-16 grid gap-6 text-left sm:grid-cols-2">
+              {manifesto.map((line, index) => (
                 <div
-                  key={step}
-                  className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
+                  key={line}
+                  className="group flex items-start gap-4 rounded-2xl border border-white/5 bg-white/[0.02] p-5 transition hover:border-[#f5d67b]/20 hover:bg-white/[0.04]"
                 >
-                  <span className="mt-1 inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#f5d67b]/20 text-sm font-semibold text-[#f5d67b]">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#f5d67b]/20 to-[#f5d67b]/5 font-mono text-sm font-bold text-[#f5d67b]">
                     {index + 1}
                   </span>
-                  <p className="text-white/80">{step}</p>
+                  <p className="text-white/80 group-hover:text-white">{line}</p>
                 </div>
               ))}
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <section className="mx-auto max-w-6xl px-6 pb-24">
-        <div className="flex flex-col gap-12 rounded-[2.5rem] border border-white/10 bg-black/20 p-8 shadow-[0_30px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-12">
-          <div className="space-y-4">
-            <p className="text-xs uppercase tracking-[0.4em] text-[#f5d67b]">What you get</p>
-            <h2 className="text-3xl font-semibold text-white">
-              Crafted surfaces for every mission-critical workflow.
-            </h2>
-            <p className="text-white/65">
-              Profile, wallet, and video management share the same aesthetic language so the entire
-              experience feels luxury, yet familiar.
-            </p>
-          </div>
+      {/* How It Works Section */}
+      <section className="mx-auto max-w-6xl px-6 pb-16">
+        <div className="text-center space-y-4 mb-12">
+          <p className="text-xs uppercase tracking-[0.5em] text-[#f5d67b]">How the arena works</p>
+          <h2 className="text-3xl font-semibold text-white sm:text-4xl">
+            Daily competition. Community curation. Real rewards.
+          </h2>
+        </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            {features.map((feature) => (
-              <div
-                key={feature.title}
-                className="rounded-3xl border border-white/10 bg-white/5 px-6 py-6"
-                style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,0,0,0.05))" }}
-              >
-                <span className="inline-flex rounded-full border border-white/10 px-4 py-1 text-[0.65rem] uppercase tracking-[0.3em] text-white/60">
-                  {feature.tag}
-                </span>
-                <h3 className="mt-4 text-xl font-semibold text-white">{feature.title}</h3>
-                <p className="mt-2 text-sm text-white/65">{feature.description}</p>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {pillars.map((pillar) => (
+            <div
+              key={pillar.title}
+              className="group relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.05] to-transparent p-6 transition hover:border-[#f5d67b]/30"
+            >
+              <div className="absolute -right-4 -top-4 text-6xl opacity-10 transition group-hover:opacity-20">
+                {pillar.icon}
               </div>
-            ))}
-          </div>
+              <div className="relative">
+                <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f5d67b]/10 text-2xl">
+                  {pillar.icon}
+                </div>
+                <h3 className="mb-2 text-lg font-semibold text-white">{pillar.title}</h3>
+                <p className="text-sm leading-relaxed text-white/60">{pillar.description}</p>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#f5d67b]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
+            </div>
+          ))}
+        </div>
+      </section>
 
-          <div className="flex flex-wrap gap-4">
-            <Link
-              href="/profile"
-              className="inline-flex items-center justify-center rounded-full border border-white/15 px-6 py-3 text-xs font-semibold uppercase tracking-[0.4em] text-white/80 transition hover:border-[#f5d67b]/60 hover:text-white"
-            >
-              Tune your profile
-            </Link>
-            <Link
-              href="/login"
-              className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-6 py-3 text-xs font-semibold uppercase tracking-[0.4em] text-[#f5d67b] transition hover:bg-white/10"
-            >
-              Existing member
-            </Link>
+      {/* Stats + CTA Section */}
+      <section className="mx-auto max-w-6xl px-6 pb-24">
+        <div className="overflow-hidden rounded-[3rem] border border-white/10 bg-gradient-to-br from-[#f5d67b]/5 via-black/40 to-black/60 backdrop-blur-xl">
+          <div className="flex flex-col items-center gap-12 p-8 text-center sm:p-12 lg:flex-row lg:text-left">
+            <div className="flex-1 space-y-6">
+              <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2">
+                <span className="text-xl">💩</span>
+                <span className="text-sm text-white/60">→</span>
+                <span className="text-xl">🤌</span>
+                <span className="ml-2 text-sm font-medium text-white/80">The journey from slop to art</span>
+              </div>
+
+              <h2 className="text-3xl font-semibold text-white sm:text-4xl">
+                Ready to prove AI can make real art?
+              </h2>
+
+              <p className="text-white/60">
+                Enter the daily arena. Share your process. Learn from others. 
+                Get rewarded when the community recognizes your work as art, not slop.
+              </p>
+
+              <div className="flex flex-wrap justify-center gap-4 lg:justify-start">
+                <Link
+                  href="/signup"
+                  className="inline-flex items-center justify-center rounded-full border border-[#f5d67b] bg-[#f5d67b] px-8 py-3 text-sm font-semibold uppercase tracking-[0.25em] text-black shadow-[0_20px_45px_rgba(245,214,123,0.35)] transition hover:-translate-y-0.5 hover:bg-[#ffe8a0]"
+                >
+                  Enter the Arena
+                </Link>
+                <Link
+                  href="/about"
+                  className="inline-flex items-center justify-center rounded-full border border-white/15 px-8 py-3 text-sm font-semibold uppercase tracking-[0.25em] text-white/80 transition hover:border-[#f5d67b]/60 hover:text-white"
+                >
+                  Learn More
+                </Link>
+              </div>
+            </div>
+
+            <div className="flex gap-4 lg:gap-6">
+              {stats.map((stat) => (
+                <div
+                  key={stat.label}
+                  className="flex flex-col items-center rounded-2xl border border-white/10 bg-black/40 px-6 py-5 shadow-[0_10px_40px_rgba(0,0,0,0.35)]"
+                >
+                  <p className="text-2xl font-bold text-[#f5d67b] sm:text-3xl">{stat.value}</p>
+                  <p className="text-[0.65rem] uppercase tracking-[0.35em] text-white/50">{stat.label}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>

@@ -17,6 +17,9 @@ export interface Database {
           usdc_wallet_address: string | null
           twitter_handle: string | null
           instagram_handle: string | null
+          avatar_url: string | null
+          banner_url: string | null
+          bio: string | null
           created_at: string
           updated_at: string
         }
@@ -27,6 +30,9 @@ export interface Database {
           usdc_wallet_address?: string | null
           twitter_handle?: string | null
           instagram_handle?: string | null
+          avatar_url?: string | null
+          banner_url?: string | null
+          bio?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -37,6 +43,9 @@ export interface Database {
           usdc_wallet_address?: string | null
           twitter_handle?: string | null
           instagram_handle?: string | null
+          avatar_url?: string | null
+          banner_url?: string | null
+          bio?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -48,6 +57,7 @@ export interface Database {
           profile_id: string
           title: string
           description: string
+          prompt: string | null
           generation_source: 'ai' | 'human'
           mux_asset_id: string
           mux_playback_id: string | null
@@ -61,6 +71,7 @@ export interface Database {
           profile_id: string
           title: string
           description: string
+          prompt?: string | null
           generation_source?: 'ai' | 'human'
           mux_asset_id: string
           mux_playback_id?: string | null
@@ -74,6 +85,7 @@ export interface Database {
           profile_id?: string
           title?: string
           description?: string
+          prompt?: string | null
           generation_source?: 'ai' | 'human'
           mux_asset_id?: string
           mux_playback_id?: string | null

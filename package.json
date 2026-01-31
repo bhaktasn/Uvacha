@@ -11,11 +11,15 @@
   "dependencies": {
     "@mux/mux-node": "^12.8.0",
     "@mux/mux-player-react": "^3.9.0",
+    "@rainbow-me/rainbowkit": "^2.2.10",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.81.1",
+    "@tanstack/react-query": "^5.90.19",
     "next": "^16.1.1",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "viem": "^2.44.4",
+    "wagmi": "^2.19.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

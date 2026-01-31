@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 const TITLE_MIN = 3
 const TITLE_MAX = 120
 const DESCRIPTION_MAX = 5000
+const PROMPT_MAX = 10000
 const GENERATION_SOURCES = new Set(['ai', 'human'])
 
 export async function POST(req: Request) {
@@ -28,6 +29,7 @@ export async function POST(req: Request) {
     const body = await req.json()
     const title: string = (body?.title ?? '').trim()
     const description: string = (body?.description ?? '').trim()
+    const prompt: string | null = body?.prompt ? String(body.prompt).trim() : null
     const rawGenerationSource: string = (body?.generationSource ?? 'human').toLowerCase()
     const unlockAtInput: string | undefined = body?.unlockAt
 
@@ -49,6 +51,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'generationSource must be either "ai" or "human".' }, { status: 400 })
     }
 
+    if (prompt && prompt.length > PROMPT_MAX) {
+      return NextResponse.json(
+        { error: `Prompt must be under ${PROMPT_MAX} characters.` },
+        { status: 400 }
+      )
+    }
+
     const unlockDate = unlockAtInput ? new Date(unlockAtInput) : new Date()
 
     if (Number.isNaN(unlockDate.getTime())) {
@@ -63,6 +72,7 @@ export async function POST(req: Request) {
       profileId: user.id,
       title,
       description,
+      prompt,
       generationSource: rawGenerationSource,
       unlockAt: unlockDate.toISOString(),
     }
