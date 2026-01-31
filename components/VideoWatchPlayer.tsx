@@ -16,7 +16,7 @@ export function VideoWatchPlayer({ playbackId, poster }: VideoWatchPlayerProps) 
       streamType="on-demand"
       preload="metadata"
       preferPlayback="mse"
-      autoPlay={false}
+      autoPlay="muted"
       accentColor="#f5d67b"
     />
   );

@@ -1,7 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
 
-import { getMuxThumbnailUrl } from "@/lib/mux/thumbnails";
+import { VideoCard } from "@/components/VideoCard";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/types/database";
 
@@ -12,7 +11,7 @@ type SearchResult = Pick<
   VideoRow,
   "id" | "title" | "description" | "created_at" | "generation_source" | "mux_playback_id"
 > & {
-  profiles: Pick<ProfileRow, "username"> | null;
+  profiles: Pick<ProfileRow, "username" | "avatar_url"> | null;
 };
 
 type RawSearchResult = Omit<SearchResult, "profiles"> & {
@@ -25,12 +24,6 @@ const MAX_RESULTS = 50;
 export const revalidate = 0;
 export const dynamic = "force-dynamic";
 
-const publishedDateFormatter = new Intl.DateTimeFormat(undefined, {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-});
-
 // Only sanitize SQL wildcards that could cause issues, preserve underscores for usernames
 const sanitizeQuery = (query: string) => query.replace(/[%]/g, "").replace(/\s+/g, " ").trim();
 
@@ -42,7 +35,7 @@ async function searchVideos(query: string): Promise<SearchResult[]> {
   const videoSearchPromise = supabase
     .from("videos")
     .select(
-      "id,title,description,created_at,generation_source,mux_playback_id,profiles:profiles!videos_profile_id_fkey(username)",
+      "id,title,description,created_at,generation_source,mux_playback_id,profiles:profiles!videos_profile_id_fkey(username,avatar_url)",
     )
     .lte("unlock_at", now)
     .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
@@ -71,7 +64,7 @@ async function searchVideos(query: string): Promise<SearchResult[]> {
     const { data: profileVideos, error: profileVideosError } = await supabase
       .from("videos")
       .select(
-        "id,title,description,created_at,generation_source,mux_playback_id,profiles:profiles!videos_profile_id_fkey(username)",
+        "id,title,description,created_at,generation_source,mux_playback_id,profiles:profiles!videos_profile_id_fkey(username,avatar_url)",
       )
       .lte("unlock_at", now)
       .in("profile_id", profileIds)
@@ -110,8 +103,6 @@ async function searchVideos(query: string): Promise<SearchResult[]> {
     profiles: Array.isArray(video.profiles) ? video.profiles[0] ?? null : video.profiles ?? null,
   }));
 }
-
-const formatCreatorHandle = (username?: string | null) => (username ? `@${username}` : "Unknown creator");
 
 type SearchPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -188,46 +179,18 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             {hasResults ? (
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {results.map((video) => (
-                  <Link
+                  <VideoCard
                     key={video.id}
-                    href={`/videos/${video.id}`}
-                    className="group flex flex-col rounded-3xl border border-white/10 bg-white/[0.03] p-4 shadow-[0_25px_80px_rgba(0,0,0,0.45)] transition duration-200 hover:-translate-y-1 hover:border-[#f5d67b]/60"
-                  >
-                    <div className="relative overflow-hidden rounded-2xl border border-white/10">
-                      {video.mux_playback_id ? (
-                        <div className="relative aspect-video w-full">
-                          <Image
-                            src={
-                              getMuxThumbnailUrl(video.mux_playback_id, {
-                                width: 640,
-                                height: 360,
-                                time: 2,
-                              })!
-                            }
-                            alt={`Preview for ${video.title}`}
-                            fill
-                            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                            className="object-cover transition duration-300 group-hover:scale-[1.03]"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                        </div>
-                      ) : (
-                        <div className="aspect-video w-full bg-[radial-gradient(circle_at_top,_rgba(245,214,123,0.25),_transparent_55%)] transition duration-200 group-hover:scale-[1.02]" />
-                      )}
-                      <span className="absolute bottom-3 left-0 flex items-center gap-2 rounded-r-full bg-black/70 px-4 py-1 text-xs uppercase tracking-[0.4em] text-white/80">
-                        {video.generation_source === "ai" ? "AI" : "Human"}
-                      </span>
-                    </div>
-
-                    <div className="mt-4 flex flex-1 flex-col gap-2">
-                      <h3 className="text-lg font-semibold text-white">{video.title}</h3>
-                      <p className="line-clamp-2 text-sm text-white/60">{video.description}</p>
-                      <div className="mt-auto text-xs uppercase tracking-[0.4em] text-white/40">
-                        <p>{formatCreatorHandle(video.profiles?.username)}</p>
-                        <p>{publishedDateFormatter.format(new Date(video.created_at))}</p>
-                      </div>
-                    </div>
-                  </Link>
+                    id={video.id}
+                    title={video.title}
+                    description={video.description}
+                    createdAt={video.created_at}
+                    generationSource={video.generation_source}
+                    muxPlaybackId={video.mux_playback_id}
+                    creatorUsername={video.profiles?.username ?? null}
+                    creatorAvatarUrl={video.profiles?.avatar_url}
+                    showDescription
+                  />
                 ))}
               </div>
             ) : (

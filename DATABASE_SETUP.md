@@ -91,6 +91,9 @@ CREATE TABLE videos (
   title TEXT NOT NULL CHECK (char_length(title) BETWEEN 3 AND 120),
   description TEXT NOT NULL CHECK (char_length(description) BETWEEN 1 AND 5000),
   
+  -- Optional AI prompt used to generate the video (up to 10k chars)
+  prompt TEXT CHECK (prompt IS NULL OR char_length(prompt) <= 10000),
+  
   -- Track whether the video was made by AI or a human
   generation_source TEXT NOT NULL DEFAULT 'human'
     CHECK (generation_source IN ('ai', 'human')),
@@ -353,6 +356,7 @@ COMMENT ON COLUMN profiles.instagram_handle IS 'Instagram handle without @ symbo
 
 COMMENT ON TABLE videos IS 'MUX-hosted video metadata with release windows';
 COMMENT ON COLUMN videos.profile_id IS 'Owner of the video; references profiles.id/auth.uid()';
+COMMENT ON COLUMN videos.prompt IS 'Optional AI generation prompt shared by the creator (up to 10k chars)';
 COMMENT ON COLUMN videos.generation_source IS 'Whether the video was AI or human generated';
 COMMENT ON COLUMN videos.mux_asset_id IS 'MUX asset ID returned after an upload';
 COMMENT ON COLUMN videos.mux_playback_id IS 'MUX playback ID used for streaming';
@@ -390,6 +394,7 @@ COMMENT ON COLUMN video_ratings.rating IS 'Whole-number score between 1 (Slop) a
    - profile_id (uuid, references profiles.id)
    - title (text)
    - description (text)
+   - prompt (text, nullable, max 10000 chars)
    - generation_source (text, constrained to `ai` or `human`)
    - mux_asset_id (text)
    - mux_playback_id (text, nullable)
@@ -460,6 +465,25 @@ SELECT * FROM profiles;
 -- Test that RLS is working (should return nothing when not authenticated)
 SELECT * FROM profiles WHERE id = '00000000-0000-0000-0000-000000000000';
 ```
+
+## Updating Existing Projects for AI Prompts (January 2026)
+
+If your Supabase project was created before the AI prompts feature, run the following SQL snippet from the SQL Editor to add the new column:
+
+```sql
+-- Add the prompt column to videos table
+ALTER TABLE public.videos
+  ADD COLUMN IF NOT EXISTS prompt TEXT CHECK (prompt IS NULL OR char_length(prompt) <= 10000);
+
+-- Add documentation comment
+COMMENT ON COLUMN videos.prompt IS 'Optional AI generation prompt shared by the creator (up to 10k chars)';
+```
+
+After running the script:
+
+1. Confirm the `prompt` column exists in **Table Editor → Data → videos**.
+2. Test by editing an existing video to add a prompt.
+3. Verify the video detail page displays the "View AI Prompt" dropdown when a prompt is present.
 
 ## Updating Existing Projects for Video Ratings (November 2025)
 
@@ -600,6 +624,7 @@ required beyond adding the column—existing rows default to `0` views.
 | `profile_id` | UUID | No | References the creator's profile (`profiles.id`). Deletes cascade with the profile. |
 | `title` | TEXT | No | Required video title (3–120 chars). |
 | `description` | TEXT | No | Long-form description (up to ~5k chars). |
+| `prompt` | TEXT | Yes | Optional AI generation prompt (up to 10k chars). Creators can share the prompts used to generate their AI videos. |
 | `generation_source` | TEXT | No | `ai` or `human`, allowing uploaders to flag how the video was produced. |
 | `mux_asset_id` | TEXT | No | Required ID returned by MUX after upload/ingest. |
 | `mux_playback_id` | TEXT | Yes | Optional playback ID used to request streaming URLs from MUX. |
@@ -724,5 +749,5 @@ If you encounter issues:
 
 ---
 
-Last updated: November 2025
+Last updated: January 2026
 
