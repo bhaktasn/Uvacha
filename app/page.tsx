@@ -22,25 +22,25 @@ const pillars = [
   {
     title: "Daily Battles",
     description:
-      "Every 24 hours, a new arena. Submit your best AI-generated video and let the community decide if it's art or slop.",
+      "Every 24 hours, a fresh arena opens. Submit your best AI-generated video and let the community discover what you can do.",
     icon: "⚔️",
   },
   {
     title: "Community Curators",
     description:
-      "No algorithms, no gatekeepers. Real humans rate every video on a 0-5 scale—💩 slop to 🤌 certified art.",
+      "No algorithms, no gatekeepers. Real humans rate every video—from forgettable to 🤌 certified art.",
     icon: "👁️",
   },
   {
     title: "USDC Rewards",
     description:
-      "Top-rated videos of the day split the daily prize pool. Create art, get paid. Simple as that.",
+      "Top-rated videos of the day split the prize pool. Make something people love, get paid. That's the deal.",
     icon: "💰",
   },
   {
     title: "Prompt Sharing",
     description:
-      "Learn from the best. Creators share their prompts, techniques, and workflows. Tip them if their secrets helped you level up.",
+      "Learn from the best. Creators share their prompts, techniques, and workflows. Tip them when their insights help you level up.",
     icon: "🔓",
   },
 ] as const;
@@ -52,10 +52,10 @@ const stats = [
 ] as const;
 
 const manifesto = [
-  "2026 is the year of the Slopacolypse.",
-  "AI video tools flood every platform with noise.",
-  "Uvacha is the antidote—a daily arena where art rises and slop gets labeled.",
-  "Join the resistance. Create something worth watching.",
+  "AI video just got incredibly powerful.",
+  "Anyone can create—but who's making something truly worth watching?",
+  "Uvacha is the stage where real artistry gets discovered and celebrated.",
+  "Show us what you've got. The community is waiting.",
 ] as const;
 
 async function fetchLatestVideos(): Promise<VideoPreview[]> {
@@ -127,39 +127,39 @@ export default async function Home() {
       {/* The Manifesto Section */}
       <section className="relative mx-auto max-w-6xl px-6 pb-16 pt-20">
         <div className="absolute inset-0 -z-10">
-          <div className="absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-red-900/20 via-orange-900/10 to-transparent blur-[100px]" />
+          <div className="absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-amber-900/20 via-orange-900/10 to-transparent blur-[100px]" />
         </div>
 
-        <div className="relative overflow-hidden rounded-[3rem] border border-white/5 bg-gradient-to-br from-black/80 via-black/60 to-red-950/20 p-1">
-          <div className="rounded-[2.75rem] bg-gradient-to-br from-[#0a0a0a] to-[#0f0808] p-8 sm:p-12 lg:p-16">
+        <div className="relative overflow-hidden rounded-[3rem] border border-white/5 bg-gradient-to-br from-black/80 via-black/60 to-amber-950/20 p-1">
+          <div className="rounded-[2.75rem] bg-gradient-to-br from-[#0a0a0a] to-[#0d0a06] p-8 sm:p-12 lg:p-16">
             <div className="mb-12 flex items-center gap-4">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-red-500/50 to-transparent" />
-              <span className="font-mono text-xs uppercase tracking-[0.5em] text-red-400/80">
-                ⚠️ The Slopacolypse is here
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#f5d67b]/50 to-transparent" />
+              <span className="font-mono text-xs uppercase tracking-[0.5em] text-[#f5d67b]/80">
+                ✨ A new kind of stage
               </span>
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-red-500/50 to-transparent" />
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#f5d67b]/50 to-transparent" />
             </div>
 
             <div className="mx-auto max-w-3xl space-y-8 text-center">
               <h2 className="text-3xl font-bold leading-tight text-white sm:text-4xl lg:text-5xl">
                 <span className="bg-gradient-to-r from-white via-white to-white/60 bg-clip-text text-transparent">
-                  AI video is flooding every platform.
+                  Everyone's making AI video now.
                 </span>
                 <br />
                 <span className="bg-gradient-to-r from-[#f5d67b] to-[#ff9d4d] bg-clip-text text-transparent">
-                  Most of it is slop.
+                  But who's making art?
                 </span>
               </h2>
 
               <p className="text-lg leading-relaxed text-white/60 sm:text-xl">
-                Andrej Karpathy called it—2026 is the year of the Slopacolypse. Every scroll is 
-                drowning in AI-generated noise. But buried in the flood? Real art. Real vision. 
-                Real creativity waiting to be discovered.
+                The tools are here. The creators are emerging. Somewhere in this new wave of 
+                AI-generated video, there's genuinely stunning work—visionary, surprising, beautiful. 
+                Uvacha is where it gets found.
               </p>
 
               <div className="inline-flex items-center gap-2 rounded-full border border-[#f5d67b]/30 bg-[#f5d67b]/10 px-6 py-2">
                 <span className="text-2xl">🤌</span>
-                <span className="font-semibold text-[#f5d67b]">Uvacha separates art from slop.</span>
+                <span className="font-semibold text-[#f5d67b]">The stage for AI video that actually matters.</span>
               </div>
             </div>
 
@@ -217,19 +217,19 @@ export default async function Home() {
           <div className="flex flex-col items-center gap-12 p-8 text-center sm:p-12 lg:flex-row lg:text-left">
             <div className="flex-1 space-y-6">
               <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                <span className="text-xl">💩</span>
+                <span className="text-xl">🎬</span>
                 <span className="text-sm text-white/60">→</span>
                 <span className="text-xl">🤌</span>
-                <span className="ml-2 text-sm font-medium text-white/80">The journey from slop to art</span>
+                <span className="ml-2 text-sm font-medium text-white/80">Create, compete, get discovered</span>
               </div>
 
               <h2 className="text-3xl font-semibold text-white sm:text-4xl">
-                Ready to prove AI can make real art?
+                This is where AI artists get found.
               </h2>
 
               <p className="text-white/60">
                 Enter the daily arena. Share your process. Learn from others. 
-                Get rewarded when the community recognizes your work as art, not slop.
+                When the community loves your work, you get paid. Simple as that.
               </p>
 
               <div className="flex flex-wrap justify-center gap-4 lg:justify-start">
