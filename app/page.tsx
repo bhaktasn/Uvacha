@@ -22,13 +22,13 @@ const pillars = [
   {
     title: "Daily Battles",
     description:
-      "Every 24 hours, a fresh arena opens. Submit your best AI-generated video and let the community discover what you can do.",
+      "Every 24 hours, a new arena opens. Submit your best AI-generated video and let the community decide if it's art or slop.",
     icon: "⚔️",
   },
   {
     title: "Community Curators",
     description:
-      "No algorithms, no gatekeepers. Real humans rate every video—from forgettable to 🤌 certified art.",
+      "No algorithms, no gatekeepers. Real humans rate every video from 💩 slopto 🤌 certified art.",
     icon: "👁️",
   },
   {
