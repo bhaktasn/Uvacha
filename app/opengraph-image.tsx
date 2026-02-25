@@ -71,14 +71,17 @@ export default function OpenGraphImage() {
           </div>
           <div
             style={{
+              display: "flex",
+              flexWrap: "wrap",
               marginTop: 28,
               fontSize: 58,
               lineHeight: 1.1,
               fontWeight: 700,
             }}
           >
-            The daily video competition to separate{" "}
-            <span style={{ color: "#f5d67b" }}>art</span> from slop.
+            <span>The daily video competition to separate </span>
+            <span style={{ color: "#f5d67b" }}>art</span>
+            <span> from slop.</span>
           </div>
           <div
             style={{
