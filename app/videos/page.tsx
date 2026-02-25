@@ -105,7 +105,7 @@ export default function VideosPage() {
     title: '',
     description: '',
     prompt: '',
-    generationSource: 'human' as 'ai' | 'human',
+    generationSource: 'ai' as 'ai' | 'human',
     competitionDate: defaultCompetitionDateValue(),
   })
   const [isSavingEdit, setIsSavingEdit] = useState(false)
@@ -115,7 +115,7 @@ export default function VideosPage() {
     title: '',
     description: '',
     prompt: '',
-    generationSource: 'human' as 'ai' | 'human',
+    generationSource: 'ai' as 'ai' | 'human',
     competitionDate: initialCompetitionDateRef.current,
   })
   const [showCalendar, setShowCalendar] = useState(false)
@@ -218,7 +218,7 @@ export default function VideosPage() {
       title: '',
       description: '',
       prompt: '',
-      generationSource: 'human',
+      generationSource: 'ai',
       competitionDate: defaultCompetitionDateValue(),
     })
     setFile(null)
@@ -335,7 +335,7 @@ export default function VideosPage() {
       title: '',
       description: '',
       prompt: '',
-      generationSource: 'human',
+      generationSource: 'ai',
       competitionDate: defaultCompetitionDateValue(),
     })
   }
@@ -608,19 +608,32 @@ export default function VideosPage() {
 
               <div>
                 <label className="text-xs uppercase tracking-[0.4em] text-white/60">Generation</label>
-                <select
-                  name="generationSource"
-                  value={form.generationSource}
-                  onChange={handleInputChange}
-                  className={`${fieldClass} text-white`}
-                >
-                  <option value="human" className="text-black">
-                    Human generated
-                  </option>
-                  <option value="ai" className="text-black">
+                <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl border border-white/15 bg-white/5 p-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, generationSource: 'ai' }))}
+                    aria-pressed={form.generationSource === 'ai'}
+                    className={`rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.3em] transition ${
+                      form.generationSource === 'ai'
+                        ? 'bg-[#f5d67b] text-black'
+                        : 'border border-white/15 bg-transparent text-white/70 hover:border-white/40 hover:text-white'
+                    }`}
+                  >
                     AI generated
-                  </option>
-                </select>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, generationSource: 'human' }))}
+                    aria-pressed={form.generationSource === 'human'}
+                    className={`rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.3em] transition ${
+                      form.generationSource === 'human'
+                        ? 'bg-[#f5d67b] text-black'
+                        : 'border border-white/15 bg-transparent text-white/70 hover:border-white/40 hover:text-white'
+                    }`}
+                  >
+                    Human generated
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -859,19 +872,32 @@ export default function VideosPage() {
 
                   <div>
                     <label className="text-xs uppercase tracking-[0.4em] text-white/60">Generation</label>
-                    <select
-                      name="generationSource"
-                      value={editForm.generationSource}
-                      onChange={handleEditInputChange}
-                      className={`${fieldClass} text-white`}
-                    >
-                      <option value="human" className="text-black">
-                        Human generated
-                      </option>
-                      <option value="ai" className="text-black">
+                    <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl border border-white/15 bg-white/5 p-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditForm((prev) => ({ ...prev, generationSource: 'ai' }))}
+                        aria-pressed={editForm.generationSource === 'ai'}
+                        className={`rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.3em] transition ${
+                          editForm.generationSource === 'ai'
+                            ? 'bg-[#f5d67b] text-black'
+                            : 'border border-white/15 bg-transparent text-white/70 hover:border-white/40 hover:text-white'
+                        }`}
+                      >
                         AI generated
-                      </option>
-                    </select>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditForm((prev) => ({ ...prev, generationSource: 'human' }))}
+                        aria-pressed={editForm.generationSource === 'human'}
+                        className={`rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.3em] transition ${
+                          editForm.generationSource === 'human'
+                            ? 'bg-[#f5d67b] text-black'
+                            : 'border border-white/15 bg-transparent text-white/70 hover:border-white/40 hover:text-white'
+                        }`}
+                      >
+                        Human generated
+                      </button>
+                    </div>
                   </div>
                 </div>
 

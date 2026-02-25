@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     const title: string = (body?.title ?? '').trim()
     const description: string = (body?.description ?? '').trim()
     const prompt: string | null = body?.prompt ? String(body.prompt).trim() : null
-    const rawGenerationSource: string = (body?.generationSource ?? 'human').toLowerCase()
+    const rawGenerationSource: string = (body?.generationSource ?? 'ai').toLowerCase()
     const unlockAtInput: string | undefined = body?.unlockAt
 
     if (title.length < TITLE_MIN || title.length > TITLE_MAX) {
