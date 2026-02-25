@@ -15,6 +15,34 @@ type Slice = {
 
 const MAX_GRID_SIZE = 20;
 
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(value, max));
+}
+
+function buildEvenGuides(segmentCount: number, totalSize: number) {
+  if (segmentCount <= 1 || totalSize <= 1) return [];
+  const guides: number[] = [];
+  for (let i = 1; i < segmentCount; i += 1) {
+    guides.push(Math.round((i * totalSize) / segmentCount));
+  }
+  return guides;
+}
+
+function reconcileGuides(prev: number[], guideCount: number, totalSize: number) {
+  if (guideCount <= 0 || totalSize <= 1) return [];
+  if (prev.length !== guideCount) {
+    return buildEvenGuides(guideCount + 1, totalSize);
+  }
+
+  const next = prev.slice();
+  for (let i = 0; i < next.length; i += 1) {
+    const min = i === 0 ? 1 : next[i - 1] + 1;
+    const max = i === next.length - 1 ? totalSize - 1 : next[i + 1] - 1;
+    next[i] = clamp(next[i], min, Math.max(min, max));
+  }
+  return next;
+}
+
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -36,8 +64,27 @@ export function StoryboardSplitter() {
   const [slices, setSlices] = useState<Slice[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sourceWidth, setSourceWidth] = useState(0);
+  const [sourceHeight, setSourceHeight] = useState(0);
+  const [trimLeft, setTrimLeft] = useState(0);
+  const [trimRight, setTrimRight] = useState(0);
+  const [trimTop, setTrimTop] = useState(0);
+  const [trimBottom, setTrimBottom] = useState(0);
+  const [verticalGuides, setVerticalGuides] = useState<number[]>([]);
+  const [horizontalGuides, setHorizontalGuides] = useState<number[]>([]);
 
   const expectedCount = useMemo(() => rows * cols, [rows, cols]);
+  const canAdjustCrop = sourceWidth > 0 && sourceHeight > 0;
+  const cropWidth = sourceWidth - trimLeft - trimRight;
+  const cropHeight = sourceHeight - trimTop - trimBottom;
+  const previewVerticalGuides = useMemo(
+    () => reconcileGuides(verticalGuides, Math.max(0, cols - 1), Math.max(0, cropWidth)),
+    [verticalGuides, cols, cropWidth]
+  );
+  const previewHorizontalGuides = useMemo(
+    () => reconcileGuides(horizontalGuides, Math.max(0, rows - 1), Math.max(0, cropHeight)),
+    [horizontalGuides, rows, cropHeight]
+  );
 
   useEffect(() => {
     return () => {
@@ -46,6 +93,14 @@ export function StoryboardSplitter() {
       }
     };
   }, [sourceImageUrl]);
+
+  useEffect(() => {
+    setVerticalGuides((prev) => reconcileGuides(prev, Math.max(0, cols - 1), Math.max(0, cropWidth)));
+  }, [cols, cropWidth]);
+
+  useEffect(() => {
+    setHorizontalGuides((prev) => reconcileGuides(prev, Math.max(0, rows - 1), Math.max(0, cropHeight)));
+  }, [rows, cropHeight]);
 
   const clearPreviousSlices = () => {
     setSlices((prev) => {
@@ -72,6 +127,41 @@ export function StoryboardSplitter() {
     if (nameWithoutExt) {
       setFileName(nameWithoutExt);
     }
+
+    const img = new Image();
+    img.onload = () => {
+      setSourceWidth(img.naturalWidth || 0);
+      setSourceHeight(img.naturalHeight || 0);
+      setTrimLeft(0);
+      setTrimRight(0);
+      setTrimTop(0);
+      setTrimBottom(0);
+      setVerticalGuides([]);
+      setHorizontalGuides([]);
+    };
+    img.src = nextUrl;
+  };
+
+  const updateVerticalGuide = (index: number, value: number) => {
+    setVerticalGuides((prev) => {
+      const next = reconcileGuides(prev, Math.max(0, cols - 1), Math.max(0, cropWidth));
+      if (index < 0 || index >= next.length) return next;
+      const min = index === 0 ? 1 : next[index - 1] + 1;
+      const max = index === next.length - 1 ? cropWidth - 1 : next[index + 1] - 1;
+      next[index] = clamp(value, min, Math.max(min, max));
+      return next;
+    });
+  };
+
+  const updateHorizontalGuide = (index: number, value: number) => {
+    setHorizontalGuides((prev) => {
+      const next = reconcileGuides(prev, Math.max(0, rows - 1), Math.max(0, cropHeight));
+      if (index < 0 || index >= next.length) return next;
+      const min = index === 0 ? 1 : next[index - 1] + 1;
+      const max = index === next.length - 1 ? cropHeight - 1 : next[index + 1] - 1;
+      next[index] = clamp(value, min, Math.max(min, max));
+      return next;
+    });
   };
 
   const splitStoryboard = async () => {
@@ -108,18 +198,36 @@ export function StoryboardSplitter() {
         throw new Error("Invalid image dimensions.");
       }
 
+      const safeTrimLeft = clamp(trimLeft, 0, Math.max(0, imgWidth - trimRight - 1));
+      const safeTrimRight = clamp(trimRight, 0, Math.max(0, imgWidth - safeTrimLeft - 1));
+      const safeTrimTop = clamp(trimTop, 0, Math.max(0, imgHeight - trimBottom - 1));
+      const safeTrimBottom = clamp(trimBottom, 0, Math.max(0, imgHeight - safeTrimTop - 1));
+
+      const cropX = safeTrimLeft;
+      const cropY = safeTrimTop;
+      const croppedWidth = imgWidth - safeTrimLeft - safeTrimRight;
+      const croppedHeight = imgHeight - safeTrimTop - safeTrimBottom;
+
+      if (croppedWidth <= 0 || croppedHeight <= 0) {
+        throw new Error("Crop area is too small. Reduce trim values.");
+      }
+
       clearPreviousSlices();
 
       const generated: Slice[] = [];
+      const xGuides = reconcileGuides(verticalGuides, Math.max(0, cols - 1), croppedWidth);
+      const yGuides = reconcileGuides(horizontalGuides, Math.max(0, rows - 1), croppedHeight);
+      const xStops = [cropX, ...xGuides.map((g) => cropX + g), cropX + croppedWidth];
+      const yStops = [cropY, ...yGuides.map((g) => cropY + g), cropY + croppedHeight];
 
       for (let row = 0; row < rows; row += 1) {
-        const yStart = Math.round((row * imgHeight) / rows);
-        const yEnd = Math.round(((row + 1) * imgHeight) / rows);
+        const yStart = yStops[row];
+        const yEnd = yStops[row + 1];
         const panelHeight = yEnd - yStart;
 
         for (let col = 0; col < cols; col += 1) {
-          const xStart = Math.round((col * imgWidth) / cols);
-          const xEnd = Math.round(((col + 1) * imgWidth) / cols);
+          const xStart = xStops[col];
+          const xEnd = xStops[col + 1];
           const panelWidth = xEnd - xStart;
 
           const canvas = document.createElement("canvas");
@@ -225,8 +333,32 @@ export function StoryboardSplitter() {
             </CardHeader>
             <CardContent className="space-y-5">
               <div>
-                <Label htmlFor="storyboard-upload">Storyboard image</Label>
-                <Input id="storyboard-upload" type="file" accept="image/*" onChange={onFileChange} />
+                <Label className="text-sm text-white/70">Step 1: Upload storyboard image</Label>
+                <label
+                  htmlFor="storyboard-upload"
+                  className="mt-2 block cursor-pointer rounded-xl border border-dashed border-white/25 bg-white/[0.02] p-5 hover:border-[#f5d67b]/60 hover:bg-white/[0.05] transition"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/5 text-[#f5d67b]">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-white">Click to upload image</div>
+                      <div className="text-xs text-white/50">PNG, JPG, WEBP supported</div>
+                    </div>
+                  </div>
+                  <Input
+                    id="storyboard-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={onFileChange}
+                    className="mt-4"
+                  />
+                </label>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -269,7 +401,7 @@ export function StoryboardSplitter() {
                   {isProcessing ? "Splitting..." : `Split into ${expectedCount} images`}
                 </Button>
                 <span className="text-sm text-white/50">
-                  Example: 3x2 grid creates 6 images.
+                  Step 2: Set rows/columns. Step 3: Adjust split area if needed.
                 </span>
               </div>
 
@@ -285,13 +417,171 @@ export function StoryboardSplitter() {
             <CardHeader>
               <CardTitle>Source Preview</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-5">
               {sourceImageUrl ? (
-                <img
-                  src={sourceImageUrl}
-                  alt="Uploaded storyboard preview"
-                  className="w-full rounded-xl border border-white/10"
-                />
+                <>
+                  <div className="relative w-full">
+                    <img
+                      src={sourceImageUrl}
+                      alt="Uploaded storyboard preview"
+                      className="w-full rounded-xl border border-white/10"
+                    />
+                    {canAdjustCrop && (
+                      <div
+                        className="absolute pointer-events-none border-2 border-[#f5d67b] rounded-lg"
+                        style={{
+                          left: `${(trimLeft / sourceWidth) * 100}%`,
+                          top: `${(trimTop / sourceHeight) * 100}%`,
+                          width: `${(cropWidth / sourceWidth) * 100}%`,
+                          height: `${(cropHeight / sourceHeight) * 100}%`,
+                        }}
+                      >
+                        {previewVerticalGuides.map((guide, idx) => (
+                          <div
+                            key={`v-${idx}`}
+                            className="absolute top-0 bottom-0 border-l border-[#f5d67b]/70"
+                            style={{ left: `${(guide / cropWidth) * 100}%` }}
+                          />
+                        ))}
+                        {previewHorizontalGuides.map((guide, idx) => (
+                          <div
+                            key={`h-${idx}`}
+                            className="absolute left-0 right-0 border-t border-[#f5d67b]/70"
+                            style={{ top: `${(guide / cropHeight) * 100}%` }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-4">
+                    <div className="text-xs uppercase tracking-[0.2em] text-white/50">
+                      Adjust split area (trim edges)
+                    </div>
+
+                    <div>
+                      <div className="mb-2 flex items-center justify-between text-sm">
+                        <span className="text-white/70">Left trim</span>
+                        <span className="text-white/50">{trimLeft}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={Math.max(0, sourceWidth - trimRight - 1)}
+                        value={trimLeft}
+                        onChange={(event) => setTrimLeft(Number(event.target.value))}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="mb-2 flex items-center justify-between text-sm">
+                        <span className="text-white/70">Right trim</span>
+                        <span className="text-white/50">{trimRight}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={Math.max(0, sourceWidth - trimLeft - 1)}
+                        value={trimRight}
+                        onChange={(event) => setTrimRight(Number(event.target.value))}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="mb-2 flex items-center justify-between text-sm">
+                        <span className="text-white/70">Top trim</span>
+                        <span className="text-white/50">{trimTop}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={Math.max(0, sourceHeight - trimBottom - 1)}
+                        value={trimTop}
+                        onChange={(event) => setTrimTop(Number(event.target.value))}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="mb-2 flex items-center justify-between text-sm">
+                        <span className="text-white/70">Bottom trim</span>
+                        <span className="text-white/50">{trimBottom}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={Math.max(0, sourceHeight - trimTop - 1)}
+                        value={trimBottom}
+                        onChange={(event) => setTrimBottom(Number(event.target.value))}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div className="text-xs text-white/50">
+                      Source: {sourceWidth} x {sourceHeight}px | Crop: {Math.max(0, cropWidth)} x {Math.max(0, cropHeight)}px
+                    </div>
+
+                    {(cols > 1 || rows > 1) && <div className="border-t border-white/10 pt-4" />}
+
+                    {cols > 1 && (
+                      <div className="space-y-4">
+                        <div className="text-xs uppercase tracking-[0.2em] text-white/50">
+                          Vertical split lines
+                        </div>
+                        {previewVerticalGuides.map((guide, idx) => {
+                          const min = idx === 0 ? 1 : previewVerticalGuides[idx - 1] + 1;
+                          const max = idx === previewVerticalGuides.length - 1 ? cropWidth - 1 : previewVerticalGuides[idx + 1] - 1;
+                          return (
+                            <div key={`vg-slider-${idx}`}>
+                              <div className="mb-2 flex items-center justify-between text-sm">
+                                <span className="text-white/70">V{idx + 1}</span>
+                                <span className="text-white/50">{guide}px</span>
+                              </div>
+                              <input
+                                type="range"
+                                min={min}
+                                max={Math.max(min, max)}
+                                value={guide}
+                                onChange={(event) => updateVerticalGuide(idx, Number(event.target.value))}
+                                className="w-full"
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {rows > 1 && (
+                      <div className="space-y-4">
+                        <div className="text-xs uppercase tracking-[0.2em] text-white/50">
+                          Horizontal split lines
+                        </div>
+                        {previewHorizontalGuides.map((guide, idx) => {
+                          const min = idx === 0 ? 1 : previewHorizontalGuides[idx - 1] + 1;
+                          const max = idx === previewHorizontalGuides.length - 1 ? cropHeight - 1 : previewHorizontalGuides[idx + 1] - 1;
+                          return (
+                            <div key={`hg-slider-${idx}`}>
+                              <div className="mb-2 flex items-center justify-between text-sm">
+                                <span className="text-white/70">H{idx + 1}</span>
+                                <span className="text-white/50">{guide}px</span>
+                              </div>
+                              <input
+                                type="range"
+                                min={min}
+                                max={Math.max(min, max)}
+                                value={guide}
+                                onChange={(event) => updateHorizontalGuide(idx, Number(event.target.value))}
+                                className="w-full"
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </>
               ) : (
                 <div className="rounded-xl border border-dashed border-white/20 px-4 py-10 text-center text-sm text-white/40">
                   Upload a storyboard image to preview it here.

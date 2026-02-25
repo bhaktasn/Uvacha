@@ -43,30 +43,30 @@ export const metadata: Metadata = {
         ? `https://${process.env.VERCEL_URL}`
         : "http://localhost:3000")
   ),
-  title: "Uvacha | Creator Launchpad",
+  title: "Uvacha | Daily Video Competition",
   description:
-    "Plan cinematic drops, validate wallets, and orchestrate MUX-powered releases from a single black-and-gold cockpit.",
+    "Daily AI video competitions to separate art from slop. Submit your best work, let the community decide, and win cash prizes in USDC.",
   openGraph: {
     type: "website",
     siteName: "Uvacha",
-    title: "Uvacha | Creator Launchpad",
+    title: "Uvacha | Daily Video Competition",
     description:
-      "Plan cinematic drops, validate wallets, and orchestrate MUX-powered releases from a single black-and-gold cockpit.",
+      "Daily AI video competitions to separate art from slop. Submit your best work, let the community decide, and win cash prizes in USDC.",
     url: "/",
     images: [
       {
         url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "Uvacha creator launchpad preview image",
+        alt: "Uvacha | Daily Video Competition",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Uvacha | Creator Launchpad",
+    title: "Uvacha | Daily Video Competition",
     description:
-      "Plan cinematic drops, validate wallets, and orchestrate MUX-powered releases from a single black-and-gold cockpit.",
+      "Daily AI video competitions to separate art from slop. Submit your best work, let the community decide, and win cash prizes in USDC.",
     images: ["/opengraph-image"],
   },
 };
