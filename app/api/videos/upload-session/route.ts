@@ -8,6 +8,7 @@ const TITLE_MAX = 120
 const DESCRIPTION_MAX = 5000
 const PROMPT_MAX = 10000
 const GENERATION_SOURCES = new Set(['ai', 'human'])
+const DUPLICATE_COMPETITION_DAY_ERROR = 'You already have a video competing on this date. Choose a different competition day.'
 
 export async function POST(req: Request) {
   try {
@@ -64,6 +65,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'unlockAt must be a valid datetime string.' }, { status: 400 })
     }
 
+    const unlockAtIso = unlockDate.toISOString()
+    const { data: existingVideoForDate, error: duplicateCheckError } = await supabase
+      .from('videos')
+      .select('id')
+      .eq('profile_id', user.id)
+      .eq('unlock_at', unlockAtIso)
+      .limit(1)
+
+    if (duplicateCheckError) {
+      console.error('Failed to check duplicate competition day', duplicateCheckError)
+      return NextResponse.json({ error: 'Failed to validate competition date' }, { status: 500 })
+    }
+
+    if (existingVideoForDate && existingVideoForDate.length > 0) {
+      return NextResponse.json({ error: DUPLICATE_COMPETITION_DAY_ERROR }, { status: 409 })
+    }
+
     const muxVideo = getMuxVideoClient()
 
     const corsOrigin = process.env.MUX_DIRECT_UPLOAD_CORS_ORIGIN || req.headers.get('origin') || '*'
@@ -74,7 +92,7 @@ export async function POST(req: Request) {
       description,
       prompt,
       generationSource: rawGenerationSource,
-      unlockAt: unlockDate.toISOString(),
+      unlockAt: unlockAtIso,
     }
 
     const passthrough = JSON.stringify(passthroughPayload)

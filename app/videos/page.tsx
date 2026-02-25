@@ -8,7 +8,7 @@ import type { Database } from '@/lib/types/database'
 
 type VideoRow = Database['public']['Tables']['videos']['Row']
 
-const defaultUnlockAtValue = () => {
+const defaultCompetitionDateValue = () => {
   const now = new Date()
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
@@ -16,7 +16,7 @@ const defaultUnlockAtValue = () => {
   return `${year}-${month}-${day}`
 }
 
-const unlockDateToMidnightIso = (dateValue: string) => {
+const competitionDateToMidnightIso = (dateValue: string) => {
   const [year, month, day] = dateValue.split('-').map(Number)
 
   if (!year || !month || !day) {
@@ -66,17 +66,18 @@ const isDateBeforeToday = (value: string) => {
 }
 
 const WEEKDAY_HEADERS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const DUPLICATE_COMPETITION_DAY_ERROR = 'You already have a video competing on this date. Choose a different competition day.'
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const isoStringToDateInput = (isoString: string) => {
   if (!isoString) {
-    return defaultUnlockAtValue()
+    return defaultCompetitionDateValue()
   }
 
   const date = new Date(isoString)
   if (Number.isNaN(date.getTime())) {
-    return defaultUnlockAtValue()
+    return defaultCompetitionDateValue()
   }
 
   const year = date.getFullYear()
@@ -88,7 +89,7 @@ const isoStringToDateInput = (isoString: string) => {
 export default function VideosPage() {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
-  const initialUnlockAtRef = useRef(defaultUnlockAtValue())
+  const initialCompetitionDateRef = useRef(defaultCompetitionDateValue())
 
   const [initialized, setInitialized] = useState(false)
   const [videos, setVideos] = useState<VideoRow[]>([])
@@ -105,7 +106,7 @@ export default function VideosPage() {
     description: '',
     prompt: '',
     generationSource: 'human' as 'ai' | 'human',
-    unlockAt: defaultUnlockAtValue(),
+    competitionDate: defaultCompetitionDateValue(),
   })
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null)
@@ -115,11 +116,11 @@ export default function VideosPage() {
     description: '',
     prompt: '',
     generationSource: 'human' as 'ai' | 'human',
-    unlockAt: initialUnlockAtRef.current,
+    competitionDate: initialCompetitionDateRef.current,
   })
   const [showCalendar, setShowCalendar] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState(() => {
-    const parsed = parseDateValue(initialUnlockAtRef.current)
+    const parsed = parseDateValue(initialCompetitionDateRef.current)
     return parsed ? new Date(parsed.year, parsed.month - 1, 1) : new Date()
   })
   const calendarRef = useRef<HTMLDivElement | null>(null)
@@ -130,8 +131,8 @@ export default function VideosPage() {
   const calendarMonthIndex = calendarMonth.getMonth()
   const firstWeekdayIndex = new Date(calendarYear, calendarMonthIndex, 1).getDay()
   const totalDaysInMonth = new Date(calendarYear, calendarMonthIndex + 1, 0).getDate()
-  const todayString = defaultUnlockAtValue()
-  const editingUnlockIsPast = editingVideo ? isDateBeforeToday(isoStringToDateInput(editingVideo.unlock_at)) : false
+  const todayString = defaultCompetitionDateValue()
+  const editingCompetitionIsPast = editingVideo ? isDateBeforeToday(isoStringToDateInput(editingVideo.unlock_at)) : false
 
   const loadVideos = async () => {
     try {
@@ -190,7 +191,7 @@ export default function VideosPage() {
   }, [showCalendar])
 
   useEffect(() => {
-    const parsed = parseDateValue(form.unlockAt)
+    const parsed = parseDateValue(form.competitionDate)
     if (!parsed) {
       return
     }
@@ -202,7 +203,7 @@ export default function VideosPage() {
 
       return new Date(parsed.year, parsed.month - 1, 1)
     })
-  }, [form.unlockAt])
+  }, [form.competitionDate])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -218,20 +219,20 @@ export default function VideosPage() {
       description: '',
       prompt: '',
       generationSource: 'human',
-      unlockAt: defaultUnlockAtValue(),
+      competitionDate: defaultCompetitionDateValue(),
     })
     setFile(null)
     setShowCalendar(false)
   }
 
-  const handleUnlockSelection = (dateString: string) => {
+  const handleCompetitionDateSelection = (dateString: string) => {
     if (isDateBeforeToday(dateString)) {
       return
     }
 
     setForm((prev) => ({
       ...prev,
-      unlockAt: dateString,
+      competitionDate: dateString,
     }))
     setShowCalendar(false)
   }
@@ -253,9 +254,9 @@ export default function VideosPage() {
     setIsSubmitting(true)
     try {
       setStatus('Creating upload session…')
-      const normalizedUnlockDate =
-        form.unlockAt && !isDateBeforeToday(form.unlockAt) ? form.unlockAt : todayString
-      const unlockAtISO = unlockDateToMidnightIso(normalizedUnlockDate)
+      const normalizedCompetitionDate =
+        form.competitionDate && !isDateBeforeToday(form.competitionDate) ? form.competitionDate : todayString
+      const unlockAtISO = competitionDateToMidnightIso(normalizedCompetitionDate)
 
       const sessionResponse = await fetch('/api/videos/upload-session', {
         method: 'POST',
@@ -294,7 +295,7 @@ export default function VideosPage() {
       const finalizedVideo = await pollForFinalization(sessionPayload.uploadId)
 
       setVideos((prev) => (finalizedVideo ? [finalizedVideo, ...prev] : prev))
-      setStatus('Video uploaded! It will unlock based on your schedule.')
+      setStatus('Video uploaded! It will enter the competition on your chosen date.')
       resetForm()
     } catch (err) {
       console.error(err)
@@ -311,7 +312,7 @@ export default function VideosPage() {
       description: video.description,
       prompt: video.prompt ?? '',
       generationSource: video.generation_source,
-      unlockAt: isoStringToDateInput(video.unlock_at),
+      competitionDate: isoStringToDateInput(video.unlock_at),
     })
     setLibraryError(null)
     setLibraryStatus(null)
@@ -335,7 +336,7 @@ export default function VideosPage() {
       description: '',
       prompt: '',
       generationSource: 'human',
-      unlockAt: defaultUnlockAtValue(),
+      competitionDate: defaultCompetitionDateValue(),
     })
   }
 
@@ -350,11 +351,27 @@ export default function VideosPage() {
     setIsSavingEdit(true)
 
     try {
-      const unlockAtISO = editingUnlockIsPast
+      const unlockAtISO = editingCompetitionIsPast
         ? editingVideo.unlock_at
-        : unlockDateToMidnightIso(
-            editForm.unlockAt && !isDateBeforeToday(editForm.unlockAt) ? editForm.unlockAt : todayString,
+        : competitionDateToMidnightIso(
+            editForm.competitionDate && !isDateBeforeToday(editForm.competitionDate) ? editForm.competitionDate : todayString,
           )
+      const { data: existingVideoOnDate, error: duplicateCheckError } = await supabase
+        .from('videos')
+        .select('id')
+        .eq('profile_id', editingVideo.profile_id)
+        .eq('unlock_at', unlockAtISO)
+        .neq('id', editingVideo.id)
+        .limit(1)
+
+      if (duplicateCheckError) {
+        throw duplicateCheckError
+      }
+
+      if (existingVideoOnDate && existingVideoOnDate.length > 0) {
+        throw new Error(DUPLICATE_COMPETITION_DAY_ERROR)
+      }
+
       const { data, error: updateError } = await supabase
         .from('videos')
         .update({
@@ -464,8 +481,8 @@ export default function VideosPage() {
             <span
               className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] ${
                 video.generation_source === 'ai'
-                  ? 'border-purple-400/40 bg-purple-500/10 text-purple-200'
-                  : 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                  ? 'border-[#f5d67b]/25 bg-[#f5d67b]/5 text-[#f5d67b]/80'
+                  : 'border-white/15 bg-white/5 text-white/60'
               }`}
             >
               {video.generation_source === 'ai' ? 'AI' : 'Human'}
@@ -508,9 +525,12 @@ export default function VideosPage() {
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs uppercase tracking-[0.4em] text-white/50">Unlocks</p>
+            <p className="text-xs uppercase tracking-[0.4em] text-white/50">Competition day</p>
             <p className="mt-2 text-white">
-              {unlockDate.toLocaleString()} ({isUnlocked ? 'Unlocked' : 'Scheduled'})
+              {unlockDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+            </p>
+            <p className={`mt-1 text-xs font-semibold uppercase tracking-[0.3em] ${isUnlocked ? 'text-white/40' : 'text-[#f5d67b]'}`}>
+              {isUnlocked ? 'Competed' : 'Scheduled'}
             </p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -555,10 +575,10 @@ export default function VideosPage() {
         <div className="relative z-10 rounded-[2.5rem] border border-white/10 bg-black/60 p-10 shadow-[0_30px_140px_rgba(0,0,0,0.6)] backdrop-blur-2xl">
           <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.5em] text-[#f5d67b]">Video ops</p>
-              <h1 className="mt-2 text-3xl font-semibold text-white">Manage videos</h1>
+              <p className="text-xs uppercase tracking-[0.5em] text-[#f5d67b]">Submit your entry</p>
+              <h1 className="mt-2 text-3xl font-semibold text-white">Enter the daily competition</h1>
               <p className="text-white/60">
-                Upload to MUX, tag AI or human energy, and decide exactly when the world can watch.
+                Upload your video, pick a competition date, and let the community decide if it&apos;s art or slop.
               </p>
             </div>
             <button
@@ -637,7 +657,8 @@ export default function VideosPage() {
 
             <div className="grid gap-6 md:grid-cols-2">
               <div>
-                <label className="text-xs uppercase tracking-[0.4em] text-white/60">Unlock at</label>
+                <label className="text-xs uppercase tracking-[0.4em] text-white/60">Competition date</label>
+                <p className="mt-1 text-xs text-white/40">Your video competes against all entries on this day</p>
                 <div className="relative" ref={calendarRef}>
                   <button
                     type="button"
@@ -646,8 +667,8 @@ export default function VideosPage() {
                     aria-haspopup="dialog"
                     aria-expanded={showCalendar}
                   >
-                    <span className={form.unlockAt ? 'text-white' : 'text-white/40'}>
-                      {form.unlockAt ? formatDateForDisplay(form.unlockAt) : 'Select a date'}
+                    <span className={form.competitionDate ? 'text-white' : 'text-white/40'}>
+                      {form.competitionDate ? formatDateForDisplay(form.competitionDate) : 'Pick a competition day'}
                     </span>
                     <svg
                       aria-hidden="true"
@@ -699,7 +720,7 @@ export default function VideosPage() {
                           const dateString = `${calendarYear}-${String(calendarMonthIndex + 1).padStart(2, '0')}-${String(
                             dayNumber,
                           ).padStart(2, '0')}`
-                          const isSelected = form.unlockAt === dateString
+                          const isSelected = form.competitionDate === dateString
                           const isToday = todayString === dateString
                           const isPast = isDateBeforeToday(dateString)
 
@@ -707,7 +728,7 @@ export default function VideosPage() {
                             <button
                               key={dateString}
                               type="button"
-                              onClick={() => handleUnlockSelection(dateString)}
+                              onClick={() => handleCompetitionDateSelection(dateString)}
                               disabled={isPast}
                               className={`rounded-xl py-2 text-white transition ${
                                 isSelected
@@ -769,8 +790,8 @@ export default function VideosPage() {
         <div className="rounded-[2.5rem] border border-white/10 bg-black/50 p-10 shadow-[0_20px_120px_rgba(0,0,0,0.55)] backdrop-blur-2xl">
           <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-semibold text-white">Your library</h2>
-              <p className="text-sm text-white/60">Drafts stay private until their unlock date.</p>
+              <h2 className="text-2xl font-semibold text-white">Your entries</h2>
+              <p className="text-sm text-white/60">Videos go live on their competition date and are rated by the community.</p>
             </div>
             <button
               onClick={loadVideos}
@@ -787,7 +808,7 @@ export default function VideosPage() {
             </div>
           )}
           {libraryStatus && (
-            <div className="mb-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+            <div className="mb-4 rounded-2xl border border-[#f5d67b]/30 bg-[#f5d67b]/10 px-4 py-3 text-sm text-[#f5d67b]">
               {libraryStatus}
             </div>
           )}
@@ -796,7 +817,7 @@ export default function VideosPage() {
             <p className="text-sm text-white/60">Loading videos...</p>
           ) : videos.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-white/20 p-8 text-center text-sm text-white/50">
-              You haven&apos;t uploaded any videos yet. Your releases will land here with their status.
+              You haven&apos;t entered any competitions yet. Submit a video above to start competing.
             </div>
           ) : (
             <div className="space-y-6">{videos.map((video) => renderVideoCard(video))}</div>
@@ -886,25 +907,25 @@ export default function VideosPage() {
 
                 <div className="grid gap-6 md:grid-cols-2">
                   <div>
-                    <label className="text-xs uppercase tracking-[0.4em] text-white/60">Unlock at</label>
+                    <label className="text-xs uppercase tracking-[0.4em] text-white/60">Competition date</label>
                     <input
                       type="date"
-                      name="unlockAt"
-                      value={editForm.unlockAt}
+                      name="competitionDate"
+                      value={editForm.competitionDate}
                       onChange={handleEditInputChange}
-                      disabled={editingUnlockIsPast}
-                      className={`${fieldClass} text-white ${editingUnlockIsPast ? 'cursor-not-allowed opacity-60' : ''}`}
+                      disabled={editingCompetitionIsPast}
+                      className={`${fieldClass} text-white ${editingCompetitionIsPast ? 'cursor-not-allowed opacity-60' : ''}`}
                       min={todayString}
                     />
                   </div>
                   <div className="flex items-end">
-                    {editingUnlockIsPast ? (
+                    {editingCompetitionIsPast ? (
                       <p className="text-xs text-white/50">
-                        Unlock date is fixed for past releases to preserve timelines.
+                        Competition date is locked for past entries to preserve results.
                       </p>
                     ) : (
                       <p className="text-xs text-white/50">
-                        Past dates will default to today&apos;s schedule when saving.
+                        Choose which day&apos;s competition your video enters.
                       </p>
                     )}
                   </div>

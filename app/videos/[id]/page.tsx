@@ -91,7 +91,14 @@ export default async function VideoDetailPage({ params }: VideoPageProps) {
     getViewerVideoRating(video.id, viewerId),
   ]);
 
-  const isUnlocked = new Date(video.unlock_at) <= new Date();
+  const competitionDate = new Date(video.unlock_at);
+  const now = new Date();
+  const isUnlocked = competitionDate <= now;
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrowStart = new Date(todayStart);
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+  const isCompetingToday = competitionDate >= todayStart && competitionDate < tomorrowStart;
+  const hasCompeted = isUnlocked && !isCompetingToday;
   const canView = isUnlocked || viewerId === video.profile_id;
   const playbackId = video.mux_playback_id ?? null;
   
@@ -134,9 +141,10 @@ export default async function VideoDetailPage({ params }: VideoPageProps) {
                 canView ? (
                   <VideoWatchPlayer playbackId={playbackId} poster={thumbnailUrl} />
                 ) : (
-                  <div className="flex aspect-video w-full items-center justify-center rounded-2xl border border-white/5 bg-white/[0.02] p-6 text-center text-white/70">
-                    This drop unlocks on{" "}
-                    {dateWithTimeFormatter.format(new Date(video.unlock_at))}. Subscribe to the creator to be notified.
+                  <div className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-6 text-center">
+                    <p className="text-lg font-semibold text-white/80">This video is competing on{" "}
+                      {dateWithTimeFormatter.format(new Date(video.unlock_at))}</p>
+                    <p className="text-sm text-white/50">It will be viewable when the competition day begins.</p>
                   </div>
                 )
               ) : (
@@ -164,14 +172,22 @@ export default async function VideoDetailPage({ params }: VideoPageProps) {
                 </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-3 text-sm text-white/60">
-                <span className="rounded-full border border-white/10 px-4 py-1">
-                  {video.generation_source === "ai" ? "AI energy" : "Human energy"}
+              <div className="mt-4 flex flex-wrap gap-3 text-sm">
+                <span className="rounded-full border border-white/10 px-4 py-1 text-white/60">
+                  {video.generation_source === "ai" ? "AI generated" : "Human made"}
                 </span>
-                <span className="rounded-full border border-white/10 px-4 py-1">
-                  {isUnlocked
-                    ? "Unlocked now"
-                    : `Unlocks ${dateWithTimeFormatter.format(new Date(video.unlock_at))}`}
+                <span className={`rounded-full border px-4 py-1 font-semibold ${
+                  hasCompeted
+                    ? "border-white/15 bg-white/5 text-white/60"
+                    : isCompetingToday
+                      ? "border-[#f5d67b]/40 bg-[#f5d67b]/10 text-[#f5d67b]"
+                      : "border-[#f5d67b]/20 bg-[#f5d67b]/5 text-[#f5d67b]/80"
+                }`}>
+                  {hasCompeted
+                    ? `Competed ${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(competitionDate)}`
+                    : isCompetingToday
+                      ? `Competing today`
+                      : `Enters competition ${new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric" }).format(competitionDate)}`}
                 </span>
               </div>
 
@@ -212,7 +228,7 @@ export default async function VideoDetailPage({ params }: VideoPageProps) {
                 </div>
               </Link>
               <p className="mt-4 text-sm text-white/65">
-                Stream the latest drop and share feedback to keep the momentum going.
+                Rate this entry and share feedback. Your vote helps separate art from slop.
               </p>
               {canTip && (
                 <div className="mt-4 pt-4 border-t border-white/10">
@@ -224,16 +240,24 @@ export default async function VideoDetailPage({ params }: VideoPageProps) {
               )}
             </div>
             <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_25px_90px_rgba(0,0,0,0.5)] backdrop-blur-xl">
-              <p className="text-xs uppercase tracking-[0.35em] text-white/50">Release window</p>
+              <p className="text-xs uppercase tracking-[0.35em] text-white/50">Competition day</p>
               <p className="mt-3 text-lg font-semibold text-white">
-                Unlocks {dateWithTimeFormatter.format(new Date(video.unlock_at))}
+                {new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(new Date(video.unlock_at))}
               </p>
               <p className="mt-1 text-sm text-white/65">
-                Uploaded {dateWithTimeFormatter.format(new Date(video.created_at))}
+                Submitted {dateWithTimeFormatter.format(new Date(video.created_at))}
               </p>
-              {!isUnlocked && (
-                <p className="mt-3 text-xs uppercase tracking-[0.3em] text-[#f5d67b]">
-                  Scheduled premiere
+              {hasCompeted ? (
+                <p className="mt-3 text-xs font-semibold uppercase tracking-[0.3em] text-white/40">
+                  Competition ended
+                </p>
+              ) : isCompetingToday ? (
+                <p className="mt-3 text-xs font-semibold uppercase tracking-[0.3em] text-[#f5d67b]">
+                  Competing now
+                </p>
+              ) : (
+                <p className="mt-3 text-xs font-semibold uppercase tracking-[0.3em] text-[#f5d67b]/70">
+                  Upcoming competition
                 </p>
               )}
             </div>

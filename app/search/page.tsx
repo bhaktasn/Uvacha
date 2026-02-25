@@ -195,7 +195,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               </div>
             ) : (
               <div className="rounded-3xl border border-dashed border-white/20 bg-black/30 px-8 py-10 text-center text-white/60">
-                No unlocked videos matched your search. Try another phrase or verify your spelling.
+                No competing videos matched your search. Try another phrase or verify your spelling.
               </div>
             )}
           </>
