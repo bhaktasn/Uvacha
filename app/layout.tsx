@@ -26,7 +26,7 @@ const guestLinks = [
 ] as const;
 
 const guestLinkBaseClasses =
-  "inline-flex items-center justify-center rounded-full px-4 py-2 md:px-6 md:py-2.5 text-[0.6rem] md:text-[0.65rem] font-semibold uppercase tracking-[0.3em] md:tracking-[0.45em] transition whitespace-nowrap";
+  "items-center justify-center rounded-full px-4 py-2 md:px-6 md:py-2.5 text-[0.6rem] md:text-[0.65rem] font-semibold uppercase tracking-[0.3em] md:tracking-[0.45em] transition whitespace-nowrap";
 
 const guestLinkVariants = {
   primary:
@@ -36,9 +36,39 @@ const guestLinkVariants = {
 } as const;
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ??
+      process.env.NEXT_PUBLIC_SITE_URL ??
+      (process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "http://localhost:3000")
+  ),
   title: "Uvacha | Creator Launchpad",
   description:
     "Plan cinematic drops, validate wallets, and orchestrate MUX-powered releases from a single black-and-gold cockpit.",
+  openGraph: {
+    type: "website",
+    siteName: "Uvacha",
+    title: "Uvacha | Creator Launchpad",
+    description:
+      "Plan cinematic drops, validate wallets, and orchestrate MUX-powered releases from a single black-and-gold cockpit.",
+    url: "/",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "Uvacha creator launchpad preview image",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Uvacha | Creator Launchpad",
+    description:
+      "Plan cinematic drops, validate wallets, and orchestrate MUX-powered releases from a single black-and-gold cockpit.",
+    images: ["/opengraph-image"],
+  },
 };
 
 export default async function RootLayout({
@@ -103,7 +133,7 @@ export default async function RootLayout({
                     {/* Mobile: Only show Sign in button */}
                     <Link
                       href="/login"
-                      className={`sm:hidden ${guestLinkBaseClasses} ${guestLinkVariants.primary}`}
+                      className={`inline-flex sm:hidden ${guestLinkBaseClasses} ${guestLinkVariants.primary}`}
                     >
                       Sign in
                     </Link>

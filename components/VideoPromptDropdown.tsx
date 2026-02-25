@@ -18,7 +18,7 @@ export function VideoPromptDropdown({ prompt }: VideoPromptDropdownProps) {
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="group flex items-center gap-2 rounded-full border border-purple-400/30 bg-purple-500/10 px-4 py-2 text-sm text-purple-200 transition hover:border-purple-400/50 hover:bg-purple-500/20"
+        className="group flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/70 transition hover:border-[#f5d67b]/30 hover:bg-white/10 hover:text-white/90"
       >
         <svg
           viewBox="0 0 24 24"
@@ -52,8 +52,8 @@ export function VideoPromptDropdown({ prompt }: VideoPromptDropdownProps) {
           isOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
         }`}
       >
-        <div className="rounded-2xl border border-purple-400/20 bg-purple-500/5 p-4">
-          <p className="mb-2 text-xs uppercase tracking-[0.3em] text-purple-300/70">Generation Prompt</p>
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <p className="mb-2 text-xs uppercase tracking-[0.3em] text-white/40">Generation Prompt</p>
           <p className="whitespace-pre-line text-sm leading-relaxed text-white/80">{prompt}</p>
         </div>
       </div>

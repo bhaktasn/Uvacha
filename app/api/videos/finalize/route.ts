@@ -11,6 +11,7 @@ interface PassthroughPayload {
   generationSource: 'ai' | 'human'
   unlockAt: string
 }
+const DUPLICATE_COMPETITION_DAY_ERROR = 'You already have a video competing on this date. Choose a different competition day.'
 
 function parsePassthrough(value?: string | null): PassthroughPayload | null {
   if (!value) return null
@@ -95,6 +96,22 @@ export async function POST(req: Request) {
 
     if (existing) {
       return NextResponse.json({ status: 'ready', video: existing })
+    }
+
+    const { data: existingVideoForDate, error: duplicateCheckError } = await supabase
+      .from('videos')
+      .select('id')
+      .eq('profile_id', user.id)
+      .eq('unlock_at', passthrough.unlockAt)
+      .limit(1)
+
+    if (duplicateCheckError) {
+      console.error('Failed to check duplicate competition day', duplicateCheckError)
+      return NextResponse.json({ error: 'Failed to validate competition date' }, { status: 500 })
+    }
+
+    if (existingVideoForDate && existingVideoForDate.length > 0) {
+      return NextResponse.json({ error: DUPLICATE_COMPETITION_DAY_ERROR }, { status: 409 })
     }
 
     const { data, error } = await supabase
