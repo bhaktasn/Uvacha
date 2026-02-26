@@ -138,9 +138,24 @@ export default function VideosPage() {
     try {
       setLoadingVideos(true)
       setLibraryError(null)
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
+
+      if (userError) {
+        throw userError
+      }
+
+      if (!user) {
+        setVideos([])
+        return
+      }
+
       const { data, error: fetchError } = await supabase
         .from('videos')
         .select('*')
+        .eq('profile_id', user.id)
         .order('created_at', { ascending: false })
 
       if (fetchError) {
