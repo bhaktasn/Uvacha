@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label } from "@/components/ui";
 
 type Slice = {
@@ -12,6 +12,14 @@ type Slice = {
   row: number;
   col: number;
 };
+
+type DragTarget =
+  | { kind: "trim-left" }
+  | { kind: "trim-right" }
+  | { kind: "trim-top" }
+  | { kind: "trim-bottom" }
+  | { kind: "vertical-guide"; index: number }
+  | { kind: "horizontal-guide"; index: number };
 
 const MAX_GRID_SIZE = 20;
 
@@ -72,6 +80,8 @@ export function StoryboardSplitter() {
   const [trimBottom, setTrimBottom] = useState(0);
   const [verticalGuides, setVerticalGuides] = useState<number[]>([]);
   const [horizontalGuides, setHorizontalGuides] = useState<number[]>([]);
+  const [activeDrag, setActiveDrag] = useState<DragTarget | null>(null);
+  const previewFrameRef = useRef<HTMLDivElement | null>(null);
 
   const expectedCount = useMemo(() => rows * cols, [rows, cols]);
   const canAdjustCrop = sourceWidth > 0 && sourceHeight > 0;
@@ -162,6 +172,68 @@ export function StoryboardSplitter() {
       next[index] = clamp(value, min, Math.max(min, max));
       return next;
     });
+  };
+
+  const getPreviewPoint = (clientX: number, clientY: number) => {
+    const frame = previewFrameRef.current;
+    if (!frame || !sourceWidth || !sourceHeight) return null;
+
+    const rect = frame.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+
+    return {
+      x: clamp(Math.round(((clientX - rect.left) / rect.width) * sourceWidth), 0, sourceWidth),
+      y: clamp(Math.round(((clientY - rect.top) / rect.height) * sourceHeight), 0, sourceHeight),
+    };
+  };
+
+  const applyDrag = (target: DragTarget, clientX: number, clientY: number) => {
+    const point = getPreviewPoint(clientX, clientY);
+    if (!point) return;
+
+    if (target.kind === "trim-left") {
+      setTrimLeft(clamp(point.x, 0, Math.max(0, sourceWidth - trimRight - 1)));
+      return;
+    }
+
+    if (target.kind === "trim-right") {
+      const x = clamp(point.x, Math.min(sourceWidth, trimLeft + 1), sourceWidth);
+      setTrimRight(clamp(sourceWidth - x, 0, Math.max(0, sourceWidth - trimLeft - 1)));
+      return;
+    }
+
+    if (target.kind === "trim-top") {
+      setTrimTop(clamp(point.y, 0, Math.max(0, sourceHeight - trimBottom - 1)));
+      return;
+    }
+
+    if (target.kind === "trim-bottom") {
+      const y = clamp(point.y, Math.min(sourceHeight, trimTop + 1), sourceHeight);
+      setTrimBottom(clamp(sourceHeight - y, 0, Math.max(0, sourceHeight - trimTop - 1)));
+      return;
+    }
+
+    if (target.kind === "vertical-guide") {
+      updateVerticalGuide(target.index, point.x - trimLeft);
+      return;
+    }
+
+    updateHorizontalGuide(target.index, point.y - trimTop);
+  };
+
+  const startDrag = (event: React.PointerEvent<HTMLElement>, target: DragTarget) => {
+    event.preventDefault();
+    event.stopPropagation();
+    previewFrameRef.current?.setPointerCapture(event.pointerId);
+    setActiveDrag(target);
+    applyDrag(target, event.clientX, event.clientY);
+  };
+
+  const stopDrag = (event: React.PointerEvent<HTMLElement>) => {
+    if (previewFrameRef.current?.hasPointerCapture(event.pointerId)) {
+      previewFrameRef.current.releasePointerCapture(event.pointerId);
+    }
+    setActiveDrag(null);
   };
 
   const splitStoryboard = async () => {
@@ -296,8 +368,8 @@ export function StoryboardSplitter() {
         <div className="absolute inset-x-0 top-10 mx-auto h-72 w-[80%] rounded-[50%] bg-[#f5d67b]/5 blur-[200px]" />
       </div>
 
-      <div className="mx-auto max-w-6xl px-6 py-8 space-y-6">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <div className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6 lg:py-6 space-y-5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <Link
               href="/tools"
@@ -317,29 +389,178 @@ export function StoryboardSplitter() {
               </svg>
               Storyboard Image Splitter
             </div>
-            <h1 className="mt-3 text-3xl md:text-4xl font-semibold text-white">
+            <h1 className="mt-3 text-2xl font-semibold text-white md:text-4xl">
               Split storyboard sheets into panel images
             </h1>
-            <p className="mt-2 text-white/60 max-w-2xl">
+            <p className="mt-2 max-w-2xl text-sm text-white/60 md:text-base">
               Upload one storyboard image, set the grid size, and download each panel as a separate PNG.
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Input</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <section className="overflow-hidden rounded-2xl border border-white/10 bg-black/35 shadow-[0_20px_60px_rgba(0,0,0,0.42)]">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
               <div>
-                <Label className="text-sm text-white/70">Step 1: Upload storyboard image</Label>
-                <label
-                  htmlFor="storyboard-upload"
-                  className="mt-2 block cursor-pointer rounded-xl border border-dashed border-white/25 bg-white/[0.02] p-5 hover:border-[#f5d67b]/60 hover:bg-white/[0.05] transition"
+                <h2 className="text-base font-semibold text-white">Source Preview</h2>
+                <div className="text-xs text-white/45">
+                  {sourceImageUrl && canAdjustCrop
+                    ? `${sourceWidth} x ${sourceHeight}px source | ${Math.max(0, cropWidth)} x ${Math.max(0, cropHeight)}px crop`
+                    : "Upload a storyboard sheet to begin"}
+                </div>
+              </div>
+              {sourceImageUrl && (
+                <div className="flex items-center gap-2 text-xs text-white/50">
+                  <span className="rounded-full border border-[#f5d67b]/30 bg-[#f5d67b]/10 px-2.5 py-1 text-[#ffe8a0]">
+                    Trim
+                  </span>
+                  <span className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-2.5 py-1 text-cyan-100">
+                    Split lines
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex min-h-[420px] items-start justify-center p-3 sm:min-h-[560px] sm:p-5 lg:min-h-[520px]">
+              {sourceImageUrl ? (
+                <div
+                  ref={previewFrameRef}
+                  className={`relative inline-block max-w-full touch-none select-none ${
+                    activeDrag ? "cursor-grabbing" : ""
+                  }`}
+                  onPointerMove={(event) => {
+                    if (activeDrag) applyDrag(activeDrag, event.clientX, event.clientY);
+                  }}
+                  onPointerUp={stopDrag}
+                  onPointerCancel={stopDrag}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/5 text-[#f5d67b]">
+                  <img
+                    src={sourceImageUrl}
+                    alt="Uploaded storyboard preview"
+                    draggable={false}
+                    className="block max-h-[58vh] w-auto max-w-full rounded-lg border border-white/10 bg-black object-contain shadow-[0_20px_50px_rgba(0,0,0,0.45)] sm:max-h-[70vh] lg:max-h-[calc(100vh-210px)]"
+                  />
+
+                  {canAdjustCrop && (
+                    <div className="absolute inset-0">
+                      <div
+                        className="absolute left-0 right-0 top-0 bg-black/55"
+                        style={{ height: `${(trimTop / sourceHeight) * 100}%` }}
+                      />
+                      <div
+                        className="absolute bottom-0 left-0 right-0 bg-black/55"
+                        style={{ height: `${(trimBottom / sourceHeight) * 100}%` }}
+                      />
+                      <div
+                        className="absolute left-0 bg-black/55"
+                        style={{
+                          top: `${(trimTop / sourceHeight) * 100}%`,
+                          width: `${(trimLeft / sourceWidth) * 100}%`,
+                          height: `${(Math.max(0, cropHeight) / sourceHeight) * 100}%`,
+                        }}
+                      />
+                      <div
+                        className="absolute right-0 bg-black/55"
+                        style={{
+                          top: `${(trimTop / sourceHeight) * 100}%`,
+                          width: `${(trimRight / sourceWidth) * 100}%`,
+                          height: `${(Math.max(0, cropHeight) / sourceHeight) * 100}%`,
+                        }}
+                      />
+
+                      <div
+                        className="pointer-events-none absolute rounded-md border-2 border-[#f5d67b] shadow-[0_0_0_1px_rgba(0,0,0,0.55),0_0_22px_rgba(245,214,123,0.28)]"
+                        style={{
+                          left: `${(trimLeft / sourceWidth) * 100}%`,
+                          top: `${(trimTop / sourceHeight) * 100}%`,
+                          width: `${(Math.max(0, cropWidth) / sourceWidth) * 100}%`,
+                          height: `${(Math.max(0, cropHeight) / sourceHeight) * 100}%`,
+                        }}
+                      />
+
+                      {[
+                        { key: "left", label: "Left trim", target: { kind: "trim-left" } as DragTarget, left: (trimLeft / sourceWidth) * 100, top: (trimTop / sourceHeight) * 100, height: (Math.max(0, cropHeight) / sourceHeight) * 100, cursor: "cursor-ew-resize" },
+                        { key: "right", label: "Right trim", target: { kind: "trim-right" } as DragTarget, left: ((sourceWidth - trimRight) / sourceWidth) * 100, top: (trimTop / sourceHeight) * 100, height: (Math.max(0, cropHeight) / sourceHeight) * 100, cursor: "cursor-ew-resize" },
+                      ].map((bar) => (
+                        <button
+                          key={bar.key}
+                          type="button"
+                          aria-label={bar.label}
+                          title={bar.label}
+                          className={`absolute z-20 w-7 -translate-x-1/2 ${bar.cursor}`}
+                          style={{ left: `${bar.left}%`, top: `${bar.top}%`, height: `${bar.height}%` }}
+                          onPointerDown={(event) => startDrag(event, bar.target)}
+                        >
+                          <span className="absolute inset-y-0 left-1/2 w-1 -translate-x-1/2 rounded-full bg-[#f5d67b] shadow-[0_0_0_1px_rgba(0,0,0,0.55),0_0_14px_rgba(245,214,123,0.7)]" />
+                          <span className="absolute left-1/2 top-1/2 h-9 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/50 bg-[#f5d67b]" />
+                        </button>
+                      ))}
+
+                      {[
+                        { key: "top", label: "Top trim", target: { kind: "trim-top" } as DragTarget, left: (trimLeft / sourceWidth) * 100, top: (trimTop / sourceHeight) * 100, width: (Math.max(0, cropWidth) / sourceWidth) * 100, cursor: "cursor-ns-resize" },
+                        { key: "bottom", label: "Bottom trim", target: { kind: "trim-bottom" } as DragTarget, left: (trimLeft / sourceWidth) * 100, top: ((sourceHeight - trimBottom) / sourceHeight) * 100, width: (Math.max(0, cropWidth) / sourceWidth) * 100, cursor: "cursor-ns-resize" },
+                      ].map((bar) => (
+                        <button
+                          key={bar.key}
+                          type="button"
+                          aria-label={bar.label}
+                          title={bar.label}
+                          className={`absolute z-20 h-7 -translate-y-1/2 ${bar.cursor}`}
+                          style={{ left: `${bar.left}%`, top: `${bar.top}%`, width: `${bar.width}%` }}
+                          onPointerDown={(event) => startDrag(event, bar.target)}
+                        >
+                          <span className="absolute left-0 top-1/2 h-1 w-full -translate-y-1/2 rounded-full bg-[#f5d67b] shadow-[0_0_0_1px_rgba(0,0,0,0.55),0_0_14px_rgba(245,214,123,0.7)]" />
+                          <span className="absolute left-1/2 top-1/2 h-3 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/50 bg-[#f5d67b]" />
+                        </button>
+                      ))}
+
+                      {previewVerticalGuides.map((guide, idx) => (
+                        <button
+                          key={`v-${idx}`}
+                          type="button"
+                          aria-label={`Vertical split line ${idx + 1}`}
+                          title={`Vertical split line ${idx + 1}`}
+                          className="absolute z-30 w-7 -translate-x-1/2 cursor-ew-resize"
+                          style={{
+                            left: `${((trimLeft + guide) / sourceWidth) * 100}%`,
+                            top: `${(trimTop / sourceHeight) * 100}%`,
+                            height: `${(Math.max(0, cropHeight) / sourceHeight) * 100}%`,
+                          }}
+                          onPointerDown={(event) => startDrag(event, { kind: "vertical-guide", index: idx })}
+                        >
+                          <span className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-cyan-200 shadow-[0_0_0_1px_rgba(0,0,0,0.7),0_0_12px_rgba(103,232,249,0.8)]" />
+                          <span className="absolute left-1/2 top-1/2 h-8 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/50 bg-cyan-200" />
+                        </button>
+                      ))}
+
+                      {previewHorizontalGuides.map((guide, idx) => (
+                        <button
+                          key={`h-${idx}`}
+                          type="button"
+                          aria-label={`Horizontal split line ${idx + 1}`}
+                          title={`Horizontal split line ${idx + 1}`}
+                          className="absolute z-30 h-7 -translate-y-1/2 cursor-ns-resize"
+                          style={{
+                            left: `${(trimLeft / sourceWidth) * 100}%`,
+                            top: `${((trimTop + guide) / sourceHeight) * 100}%`,
+                            width: `${(Math.max(0, cropWidth) / sourceWidth) * 100}%`,
+                          }}
+                          onPointerDown={(event) => startDrag(event, { kind: "horizontal-guide", index: idx })}
+                        >
+                          <span className="absolute left-0 top-1/2 h-0.5 w-full -translate-y-1/2 bg-cyan-200 shadow-[0_0_0_1px_rgba(0,0,0,0.7),0_0_12px_rgba(103,232,249,0.8)]" />
+                          <span className="absolute left-1/2 top-1/2 h-3 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/50 bg-cyan-200" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <label
+                  htmlFor="storyboard-upload-empty"
+                  className="flex min-h-[360px] w-full max-w-3xl cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/25 bg-white/[0.02] p-5 transition hover:border-[#f5d67b]/60 hover:bg-white/[0.05]"
+                >
+                  <div className="flex flex-col items-center gap-3 text-center">
+                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-lg border border-white/20 bg-white/5 text-[#f5d67b]">
                       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                         <polyline points="17 8 12 3 7 8" />
@@ -350,245 +571,112 @@ export function StoryboardSplitter() {
                       <div className="text-sm font-semibold text-white">Click to upload image</div>
                       <div className="text-xs text-white/50">PNG, JPG, WEBP supported</div>
                     </div>
+                    <Input
+                      id="storyboard-upload-empty"
+                      type="file"
+                      accept="image/*"
+                      onChange={onFileChange}
+                      className="max-w-sm"
+                    />
                   </div>
+                </label>
+              )}
+            </div>
+          </section>
+
+          <aside className="space-y-5 lg:sticky lg:top-5 lg:self-start">
+            <Card>
+              <CardHeader className="px-5 py-4">
+                <CardTitle className="text-base">Setup</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 px-5 py-4">
+                <div>
+                  <Label className="text-sm text-white/70">Upload storyboard image</Label>
                   <Input
-                    id="storyboard-upload"
+                    id="storyboard-upload-panel"
                     type="file"
                     accept="image/*"
                     onChange={onFileChange}
-                    className="mt-4"
-                  />
-                </label>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="rows">Rows</Label>
-                  <Input
-                    id="rows"
-                    type="number"
-                    min={1}
-                    max={MAX_GRID_SIZE}
-                    value={rows}
-                    onChange={(event) => setRows(Number(event.target.value))}
+                    className="mt-2"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="cols">Columns</Label>
-                  <Input
-                    id="cols"
-                    type="number"
-                    min={1}
-                    max={MAX_GRID_SIZE}
-                    value={cols}
-                    onChange={(event) => setCols(Number(event.target.value))}
-                  />
-                </div>
-              </div>
 
-              <div>
-                <Label htmlFor="base-name">Output base name</Label>
-                <Input
-                  id="base-name"
-                  value={fileName}
-                  onChange={(event) => setFileName(event.target.value)}
-                  placeholder="storyboard"
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <Button onClick={splitStoryboard} disabled={isProcessing || !sourceImageUrl}>
-                  {isProcessing ? "Splitting..." : `Split into ${expectedCount} images`}
-                </Button>
-                <span className="text-sm text-white/50">
-                  Step 2: Set rows/columns. Step 3: Adjust split area if needed.
-                </span>
-              </div>
-
-              {error && (
-                <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-                  {error}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Source Preview</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              {sourceImageUrl ? (
-                <>
-                  <div className="relative w-full">
-                    <img
-                      src={sourceImageUrl}
-                      alt="Uploaded storyboard preview"
-                      className="w-full rounded-xl border border-white/10"
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="rows">Rows</Label>
+                    <Input
+                      id="rows"
+                      type="number"
+                      min={1}
+                      max={MAX_GRID_SIZE}
+                      value={rows}
+                      onChange={(event) => setRows(Number(event.target.value))}
                     />
-                    {canAdjustCrop && (
-                      <div
-                        className="absolute pointer-events-none border-2 border-[#f5d67b] rounded-lg"
-                        style={{
-                          left: `${(trimLeft / sourceWidth) * 100}%`,
-                          top: `${(trimTop / sourceHeight) * 100}%`,
-                          width: `${(cropWidth / sourceWidth) * 100}%`,
-                          height: `${(cropHeight / sourceHeight) * 100}%`,
-                        }}
-                      >
-                        {previewVerticalGuides.map((guide, idx) => (
-                          <div
-                            key={`v-${idx}`}
-                            className="absolute top-0 bottom-0 border-l border-[#f5d67b]/70"
-                            style={{ left: `${(guide / cropWidth) * 100}%` }}
-                          />
-                        ))}
-                        {previewHorizontalGuides.map((guide, idx) => (
-                          <div
-                            key={`h-${idx}`}
-                            className="absolute left-0 right-0 border-t border-[#f5d67b]/70"
-                            style={{ top: `${(guide / cropHeight) * 100}%` }}
-                          />
-                        ))}
-                      </div>
-                    )}
                   </div>
-
-                  <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-4">
-                    <div className="text-xs uppercase tracking-[0.2em] text-white/50">
-                      Adjust split area (trim edges)
-                    </div>
-
-                    <div>
-                      <div className="mb-2 flex items-center justify-between text-sm">
-                        <span className="text-white/70">Left trim</span>
-                        <span className="text-white/50">{trimLeft}px</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={Math.max(0, sourceWidth - trimRight - 1)}
-                        value={trimLeft}
-                        onChange={(event) => setTrimLeft(Number(event.target.value))}
-                        className="w-full"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="mb-2 flex items-center justify-between text-sm">
-                        <span className="text-white/70">Right trim</span>
-                        <span className="text-white/50">{trimRight}px</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={Math.max(0, sourceWidth - trimLeft - 1)}
-                        value={trimRight}
-                        onChange={(event) => setTrimRight(Number(event.target.value))}
-                        className="w-full"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="mb-2 flex items-center justify-between text-sm">
-                        <span className="text-white/70">Top trim</span>
-                        <span className="text-white/50">{trimTop}px</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={Math.max(0, sourceHeight - trimBottom - 1)}
-                        value={trimTop}
-                        onChange={(event) => setTrimTop(Number(event.target.value))}
-                        className="w-full"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="mb-2 flex items-center justify-between text-sm">
-                        <span className="text-white/70">Bottom trim</span>
-                        <span className="text-white/50">{trimBottom}px</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={Math.max(0, sourceHeight - trimTop - 1)}
-                        value={trimBottom}
-                        onChange={(event) => setTrimBottom(Number(event.target.value))}
-                        className="w-full"
-                      />
-                    </div>
-
-                    <div className="text-xs text-white/50">
-                      Source: {sourceWidth} x {sourceHeight}px | Crop: {Math.max(0, cropWidth)} x {Math.max(0, cropHeight)}px
-                    </div>
-
-                    {(cols > 1 || rows > 1) && <div className="border-t border-white/10 pt-4" />}
-
-                    {cols > 1 && (
-                      <div className="space-y-4">
-                        <div className="text-xs uppercase tracking-[0.2em] text-white/50">
-                          Vertical split lines
-                        </div>
-                        {previewVerticalGuides.map((guide, idx) => {
-                          const min = idx === 0 ? 1 : previewVerticalGuides[idx - 1] + 1;
-                          const max = idx === previewVerticalGuides.length - 1 ? cropWidth - 1 : previewVerticalGuides[idx + 1] - 1;
-                          return (
-                            <div key={`vg-slider-${idx}`}>
-                              <div className="mb-2 flex items-center justify-between text-sm">
-                                <span className="text-white/70">V{idx + 1}</span>
-                                <span className="text-white/50">{guide}px</span>
-                              </div>
-                              <input
-                                type="range"
-                                min={min}
-                                max={Math.max(min, max)}
-                                value={guide}
-                                onChange={(event) => updateVerticalGuide(idx, Number(event.target.value))}
-                                className="w-full"
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {rows > 1 && (
-                      <div className="space-y-4">
-                        <div className="text-xs uppercase tracking-[0.2em] text-white/50">
-                          Horizontal split lines
-                        </div>
-                        {previewHorizontalGuides.map((guide, idx) => {
-                          const min = idx === 0 ? 1 : previewHorizontalGuides[idx - 1] + 1;
-                          const max = idx === previewHorizontalGuides.length - 1 ? cropHeight - 1 : previewHorizontalGuides[idx + 1] - 1;
-                          return (
-                            <div key={`hg-slider-${idx}`}>
-                              <div className="mb-2 flex items-center justify-between text-sm">
-                                <span className="text-white/70">H{idx + 1}</span>
-                                <span className="text-white/50">{guide}px</span>
-                              </div>
-                              <input
-                                type="range"
-                                min={min}
-                                max={Math.max(min, max)}
-                                value={guide}
-                                onChange={(event) => updateHorizontalGuide(idx, Number(event.target.value))}
-                                className="w-full"
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                  <div>
+                    <Label htmlFor="cols">Columns</Label>
+                    <Input
+                      id="cols"
+                      type="number"
+                      min={1}
+                      max={MAX_GRID_SIZE}
+                      value={cols}
+                      onChange={(event) => setCols(Number(event.target.value))}
+                    />
                   </div>
-                </>
-              ) : (
-                <div className="rounded-xl border border-dashed border-white/20 px-4 py-10 text-center text-sm text-white/40">
-                  Upload a storyboard image to preview it here.
                 </div>
-              )}
-            </CardContent>
-          </Card>
+
+                <div>
+                  <Label htmlFor="base-name">Output base name</Label>
+                  <Input
+                    id="base-name"
+                    value={fileName}
+                    onChange={(event) => setFileName(event.target.value)}
+                    placeholder="storyboard"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-white/55">
+                  <div>
+                    <div className="uppercase tracking-[0.15em] text-white/35">Output</div>
+                    <div className="mt-1 text-white">{expectedCount} images</div>
+                  </div>
+                  <div>
+                    <div className="uppercase tracking-[0.15em] text-white/35">Crop</div>
+                    <div className="mt-1 text-white">{Math.max(0, cropWidth)} x {Math.max(0, cropHeight)}</div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <Button onClick={splitStoryboard} disabled={isProcessing || !sourceImageUrl} className="w-full">
+                    {isProcessing ? "Splitting..." : `Split into ${expectedCount} images`}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full"
+                    disabled={!sourceImageUrl}
+                    onClick={() => {
+                      setTrimLeft(0);
+                      setTrimRight(0);
+                      setTrimTop(0);
+                      setTrimBottom(0);
+                      setVerticalGuides(buildEvenGuides(cols, sourceWidth));
+                      setHorizontalGuides(buildEvenGuides(rows, sourceHeight));
+                    }}
+                  >
+                    Reset Guides
+                  </Button>
+                </div>
+
+                {error && (
+                  <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                    {error}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </aside>
         </div>
 
         <Card>
