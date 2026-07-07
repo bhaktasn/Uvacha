@@ -81,7 +81,9 @@ export function StoryboardSplitter() {
   const [verticalGuides, setVerticalGuides] = useState<number[]>([]);
   const [horizontalGuides, setHorizontalGuides] = useState<number[]>([]);
   const [activeDrag, setActiveDrag] = useState<DragTarget | null>(null);
+  const [copiedSliceId, setCopiedSliceId] = useState<string | null>(null);
   const previewFrameRef = useRef<HTMLDivElement | null>(null);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const expectedCount = useMemo(() => rows * cols, [rows, cols]);
   const canAdjustCrop = sourceWidth > 0 && sourceHeight > 0;
@@ -100,6 +102,9 @@ export function StoryboardSplitter() {
     return () => {
       if (sourceImageUrl) {
         URL.revokeObjectURL(sourceImageUrl);
+      }
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
       }
     };
   }, [sourceImageUrl]);
@@ -362,6 +367,30 @@ export function StoryboardSplitter() {
     }
   };
 
+  const copySliceToClipboard = async (slice: Slice) => {
+    if (!navigator.clipboard?.write || !("ClipboardItem" in window)) {
+      setError("This browser does not support copying images to the clipboard. Download the panel instead.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          [slice.blob.type || "image/png"]: slice.blob,
+        }),
+      ]);
+      setError(null);
+      setCopiedSliceId(slice.id);
+
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+      copyTimeoutRef.current = setTimeout(() => setCopiedSliceId(null), 1400);
+    } catch {
+      setError("Could not copy the image. Your browser may require HTTPS or clipboard permission.");
+    }
+  };
+
   return (
     <div className="relative isolate overflow-hidden">
       <div className="absolute inset-0 -z-10 opacity-70">
@@ -414,7 +443,7 @@ export function StoryboardSplitter() {
                   <span className="rounded-full border border-[#f5d67b]/30 bg-[#f5d67b]/10 px-2.5 py-1 text-[#ffe8a0]">
                     Trim
                   </span>
-                  <span className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-2.5 py-1 text-cyan-100">
+                  <span className="rounded-full border border-[#ffe8a0]/30 bg-[#f5d67b]/10 px-2.5 py-1 text-[#fff1bd]">
                     Split lines
                   </span>
                 </div>
@@ -528,8 +557,8 @@ export function StoryboardSplitter() {
                           }}
                           onPointerDown={(event) => startDrag(event, { kind: "vertical-guide", index: idx })}
                         >
-                          <span className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-cyan-200 shadow-[0_0_0_1px_rgba(0,0,0,0.7),0_0_12px_rgba(103,232,249,0.8)]" />
-                          <span className="absolute left-1/2 top-1/2 h-8 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/50 bg-cyan-200" />
+                          <span className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-[#ffe8a0] shadow-[0_0_0_1px_rgba(0,0,0,0.7),0_0_12px_rgba(255,232,160,0.75)]" />
+                          <span className="absolute left-1/2 top-1/2 h-8 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/50 bg-[#ffe8a0]" />
                         </button>
                       ))}
 
@@ -547,8 +576,8 @@ export function StoryboardSplitter() {
                           }}
                           onPointerDown={(event) => startDrag(event, { kind: "horizontal-guide", index: idx })}
                         >
-                          <span className="absolute left-0 top-1/2 h-0.5 w-full -translate-y-1/2 bg-cyan-200 shadow-[0_0_0_1px_rgba(0,0,0,0.7),0_0_12px_rgba(103,232,249,0.8)]" />
-                          <span className="absolute left-1/2 top-1/2 h-3 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/50 bg-cyan-200" />
+                          <span className="absolute left-0 top-1/2 h-0.5 w-full -translate-y-1/2 bg-[#ffe8a0] shadow-[0_0_0_1px_rgba(0,0,0,0.7),0_0_12px_rgba(255,232,160,0.75)]" />
+                          <span className="absolute left-1/2 top-1/2 h-3 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/50 bg-[#ffe8a0]" />
                         </button>
                       ))}
                     </div>
@@ -705,13 +734,22 @@ export function StoryboardSplitter() {
                     <div className="text-xs text-white/60">
                       Row {slice.row}, Col {slice.col}
                     </div>
-                    <Button
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() => downloadBlob(slice.blob, slice.filename)}
-                    >
-                      Download
-                    </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="secondary"
+                        className="w-full"
+                        onClick={() => copySliceToClipboard(slice)}
+                      >
+                        {copiedSliceId === slice.id ? "Copied" : "Copy Image"}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="w-full"
+                        onClick={() => downloadBlob(slice.blob, slice.filename)}
+                      >
+                        Download
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
