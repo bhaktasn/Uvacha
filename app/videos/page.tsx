@@ -5,15 +5,13 @@ import { useRouter } from 'next/navigation'
 
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/types/database'
+import SubmissionBrief from '@/components/SubmissionBrief'
+import { competitionToday } from '@/lib/competition'
 
 type VideoRow = Database['public']['Tables']['videos']['Row']
 
 const defaultCompetitionDateValue = () => {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return competitionToday()
 }
 
 const competitionDateToMidnightIso = (dateValue: string) => {
@@ -23,7 +21,7 @@ const competitionDateToMidnightIso = (dateValue: string) => {
     return new Date().toISOString()
   }
 
-  const midnightLocal = new Date(year, month - 1, day, 0, 0, 0)
+  const midnightLocal = new Date(Date.UTC(year, month - 1, day))
   return midnightLocal.toISOString()
 }
 
@@ -58,11 +56,7 @@ const isDateBeforeToday = (value: string) => {
     return true
   }
 
-  const candidate = new Date(parsed.year, parsed.month - 1, parsed.day)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  return candidate < today
+  return value < competitionToday()
 }
 
 const WEEKDAY_HEADERS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -80,9 +74,9 @@ const isoStringToDateInput = (isoString: string) => {
     return defaultCompetitionDateValue()
   }
 
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
 
@@ -542,7 +536,7 @@ export default function VideosPage() {
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <p className="text-xs uppercase tracking-[0.4em] text-white/50">Competition day</p>
             <p className="mt-2 text-white">
-              {unlockDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+              {unlockDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })} (UTC)
             </p>
             <p className={`mt-1 text-xs font-semibold uppercase tracking-[0.3em] ${isUnlocked ? 'text-white/40' : 'text-[#f5d67b]'}`}>
               {isUnlocked ? 'Competed' : 'Scheduled'}
@@ -793,6 +787,8 @@ export default function VideosPage() {
               </div>
             </div>
 
+            <SubmissionBrief date={form.competitionDate} />
+
             {error && (
               <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
                 {error}
@@ -972,6 +968,8 @@ export default function VideosPage() {
                   </div>
                 </div>
 
+                <SubmissionBrief date={editForm.competitionDate} />
+
                 <div className="flex flex-wrap gap-3">
                   <button
                     type="submit"
@@ -996,5 +994,3 @@ export default function VideosPage() {
     </div>
   )
 }
-
-

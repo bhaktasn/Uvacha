@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { authDestination } from '@/lib/auth-destination'
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
@@ -8,7 +9,8 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    await supabase.auth.exchangeCodeForSession(code)
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    if (error) return NextResponse.redirect(`${origin}/login?error=callback&next=${encodeURIComponent(authDestination(requestUrl.searchParams.get('next')))}`)
 
     const {
       data: { user },
@@ -29,9 +31,10 @@ export async function GET(request: Request) {
         console.error('Error creating profile:', profileError)
       }
     }
+  } else {
+    return NextResponse.redirect(`${origin}/login?error=callback`)
   }
 
   // URL to redirect to after sign in process completes
-  return NextResponse.redirect(`${origin}/profile`)
+  return NextResponse.redirect(`${origin}${authDestination(requestUrl.searchParams.get('next'))}`)
 }
-

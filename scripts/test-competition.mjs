@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import { addDays, competitionFor, validateCompetition } from '../lib/competition.ts';
+import { authDestination } from '../lib/auth-destination.ts';
+const config = validateCompetition({ defaultPrize: 5, prizes: { '2026-10-31': 25 }, weeks: [{ id: 'horror', start: '2026-10-28', title: 'Haunted houses', brief: 'Make a horror short set in a haunted house.' }] });
+assert.equal(competitionFor(config, '2026-10-27').theme, null);
+assert.equal(competitionFor(config, '2026-10-28').theme.id, 'horror');
+assert.equal(competitionFor(config, '2026-11-03').theme.id, 'horror');
+assert.equal(competitionFor(config, '2026-11-04').theme, null);
+assert.equal(competitionFor(config, '2026-10-31').prize, 25);
+assert.equal(competitionFor(config, '2026-11-01').prize, 5);
+assert.equal(addDays('2028-02-27', 2), '2028-02-29');
+for (const amount of [-1, NaN, Infinity, 1.001]) assert.throws(() => validateCompetition({ ...config, defaultPrize: amount }));
+assert.throws(() => validateCompetition({ ...config, prizes: { '2026-02-30': 5 } }));
+assert.throws(() => validateCompetition({ ...config, weeks: [...config.weeks, { ...config.weeks[0], id: 'overlap', start: '2026-11-03' }] }));
+assert.equal(authDestination('https://evil.example'), '/videos');
+assert.equal(authDestination('//evil.example'), '/videos');
+assert.equal(authDestination('/profile'), '/profile');
+console.log('Competition boundaries, prize validation, overlaps, leap days, and redirect allowlist passed.');
