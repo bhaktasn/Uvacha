@@ -39,6 +39,18 @@ After deployment, fetch the homepage using `Twitterbot`, verify every image URL 
 
 ## Validation
 
+### Upload and creator-page follow-up
+
+The AI/Human classification is removed from application types, request payloads, database selects/writes, upload/edit controls, thumbnails, public profiles, and watch pages. Existing database installations may still have the unused column with its old default; the application works with it present or absent. `migrations/20260905_retire_generation_source.sql` is optional schema cleanup and has not been applied to the hosted database. New schema instructions omit the column. No existing videos were removed.
+
+Upload entries now show a watch-page link instead of asset IDs and raw stream URLs. Profile and upload pages use the homepage's dark panels, gold buttons, simpler labels, and mobile spacing.
+
+Diagnosis found the complete title/description/prompt embedded in Mux passthrough despite its [255-character limit](https://www.mux.com/docs/api-reference/video/direct-uploads/create-direct-upload). The form allowed far more text, so valid long submissions could fail upload-session creation. The user's precise observed error is not confirmed without its text; the inspected local server log contained no upload POST, and recent Mux uploads were successful asset creations.
+
+New uploads send compact owner metadata to Mux and return a signed receipt containing the full text, bound to the owner/upload ID and valid for seven days. Finalization verifies the signature before saving. After file transfer, the browser keeps the receipt under the signed-in user's local-storage key and offers “Check upload status” after a timeout, error, or refresh. Keep that browser's site data until the entry is saved. Existing short-metadata uploads remain supported. This provides retryable finalization, not background finalization when every browser is closed; no webhook service is introduced.
+
+`node scripts/test-upload-flow.mjs` executes the real handlers against fake providers: full-length descriptions/prompts, compact metadata, processing/retry, idempotency, signature tampering, ownership, expiry, failed processing, and legacy uploads. It sends no real file or database writes.
+
 - `node scripts/test-competition.mjs`: week boundaries, cross-month/leap-day dates, prize overrides, invalid values, overlaps, redirect allowlist.
 - `node scripts/test-ui.mjs` with the local dev server: interactive variants, submission links, password visibility, mocked email confirmation, mobile overflow, admin preview/save, rejected cross-origin and invalid writes, image response and public metadata URLs.
 - `npx tsc --noEmit`, lint of changed code, and `npm run build`.

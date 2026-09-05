@@ -1,12 +1,5 @@
 {
   "defaultPrize": 5,
   "prizes": {},
-  "weeks": [
-    {
-      "id": "648a060e-a393-4082-9174-595406ca68ec",
-      "start": "2026-09-07",
-      "title": "The horror",
-      "brief": "blah blah"
-    }
-  ]
+  "weeks": []
 }

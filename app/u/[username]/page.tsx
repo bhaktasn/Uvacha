@@ -17,7 +17,7 @@ type PublicProfile = Pick<
 
 type VideoPreview = Pick<
   VideoRow,
-  "id" | "title" | "description" | "created_at" | "generation_source" | "mux_playback_id" | "view_count"
+  "id" | "title" | "description" | "created_at" | "mux_playback_id" | "view_count"
 >;
 
 interface UserProfilePageProps {
@@ -67,7 +67,7 @@ async function fetchUserVideos(profileId: string): Promise<VideoPreview[]> {
     
     const { data, error } = await supabase
       .from("videos")
-      .select("id,title,description,created_at,generation_source,mux_playback_id,view_count")
+      .select("id,title,description,created_at,mux_playback_id,view_count")
       .eq("profile_id", profileId)
       .lte("unlock_at", now)
       .order("created_at", { ascending: false });
@@ -236,9 +236,6 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
                     ) : (
                       <div className="aspect-video w-full bg-[radial-gradient(circle_at_top,_rgba(245,214,123,0.25),_transparent_55%)] transition duration-200 group-hover:scale-[1.02]" />
                     )}
-                    <span className="absolute bottom-3 left-0 flex items-center gap-2 rounded-r-full bg-black/70 px-4 py-1 text-xs uppercase tracking-[0.4em] text-white/80">
-                      {video.generation_source === "ai" ? "AI" : "Human"}
-                    </span>
                   </div>
 
                   <div className="mt-4 flex flex-1 flex-col gap-2">
@@ -283,4 +280,3 @@ export async function generateMetadata({ params }: UserProfilePageProps) {
     description: profile.bio || `Check out @${profile.username}'s videos on Uvacha`,
   };
 }
-

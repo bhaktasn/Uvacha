@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/types/database'
@@ -9,6 +10,7 @@ import SubmissionBrief from '@/components/SubmissionBrief'
 import { competitionToday } from '@/lib/competition'
 
 type VideoRow = Database['public']['Tables']['videos']['Row']
+type PendingUpload = { uploadId: string; uploadTicket: string }
 
 const defaultCompetitionDateValue = () => {
   return competitionToday()
@@ -94,12 +96,22 @@ export default function VideosPage() {
   const [status, setStatus] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [pendingUpload, setPendingUpload] = useState<PendingUpload | null>(null)
+  const recoveryKey = useRef<string | null>(null)
+  const rememberUpload = (pending: PendingUpload | null) => {
+    setPendingUpload(pending)
+    try {
+      if (recoveryKey.current) {
+        if (pending) localStorage.setItem(recoveryKey.current, JSON.stringify(pending))
+        else localStorage.removeItem(recoveryKey.current)
+      }
+    } catch { /* Recovery still works in this tab when storage is unavailable. */ }
+  }
   const [editingVideo, setEditingVideo] = useState<VideoRow | null>(null)
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
     prompt: '',
-    generationSource: 'ai' as 'ai' | 'human',
     competitionDate: defaultCompetitionDateValue(),
   })
   const [isSavingEdit, setIsSavingEdit] = useState(false)
@@ -109,7 +121,6 @@ export default function VideosPage() {
     title: '',
     description: '',
     prompt: '',
-    generationSource: 'ai' as 'ai' | 'human',
     competitionDate: initialCompetitionDateRef.current,
   })
   const [showCalendar, setShowCalendar] = useState(false)
@@ -176,6 +187,11 @@ export default function VideosPage() {
         return
       }
 
+      recoveryKey.current = `uvacha-pending-upload:${user.id}`
+      try {
+        const saved = JSON.parse(localStorage.getItem(recoveryKey.current) ?? 'null')
+        if (typeof saved?.uploadId === 'string' && typeof saved?.uploadTicket === 'string') setPendingUpload(saved)
+      } catch { /* Ignore unavailable storage or an invalid old receipt. */ }
       await loadVideos()
       setInitialized(true)
     }
@@ -227,7 +243,6 @@ export default function VideosPage() {
       title: '',
       description: '',
       prompt: '',
-      generationSource: 'ai',
       competitionDate: defaultCompetitionDateValue(),
     })
     setFile(null)
@@ -276,7 +291,6 @@ export default function VideosPage() {
           title: form.title,
           description: form.description,
           prompt: form.prompt || null,
-          generationSource: form.generationSource,
           unlockAt: unlockAtISO,
         }),
       })
@@ -287,7 +301,7 @@ export default function VideosPage() {
         throw new Error(sessionPayload.error || 'Failed to create upload session.')
       }
 
-      setStatus('Uploading video file to MUX…')
+      setStatus('Uploading your video…')
       const uploadResponse = await fetch(sessionPayload.uploadUrl, {
         method: 'PUT',
         headers: {
@@ -297,21 +311,48 @@ export default function VideosPage() {
       })
 
       if (!uploadResponse.ok) {
-        throw new Error('Direct upload to MUX failed. Please try again.')
+        throw new Error('The video transfer failed. Check your connection and try again.')
       }
 
-      setStatus('MUX is processing your video…')
-      const finalizedVideo = await pollForFinalization(sessionPayload.uploadId)
+      setStatus('Preparing your video for playback…')
+      const pending = { uploadId: sessionPayload.uploadId, uploadTicket: sessionPayload.uploadTicket }
+      rememberUpload(pending)
+      const finalizedVideo = await pollForFinalization(pending.uploadId, pending.uploadTicket)
+
+      if (!finalizedVideo) {
+        setStatus('Your file uploaded and is still processing. You can check its status below without uploading it again.')
+        return
+      }
+      rememberUpload(null)
 
       setVideos((prev) => (finalizedVideo ? [finalizedVideo, ...prev] : prev))
       setStatus('Video uploaded! It will enter the competition on your chosen date.')
       resetForm()
     } catch (err) {
       console.error(err)
-      setError(err instanceof Error ? err.message : 'Upload failed. Please try again.')
+      setStatus(null)
+      setError(err instanceof TypeError ? 'Could not connect to the upload service. Check your connection and try again.' : err instanceof Error ? err.message : 'Upload failed. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const resumeUpload = async () => {
+    if (!pendingUpload) return
+    setIsSubmitting(true)
+    setError(null)
+    setStatus('Checking your uploaded video…')
+    try {
+      const video = await pollForFinalization(pendingUpload.uploadId, pendingUpload.uploadTicket)
+      if (!video) { setStatus('Your video is still processing. Check again shortly.'); return }
+      setVideos(previous => [video, ...previous.filter(item => item.id !== video.id)])
+      rememberUpload(null)
+      resetForm()
+      setStatus('Your video is ready and entered for its competition date.')
+    } catch (error) {
+      setStatus(null)
+      setError(error instanceof Error ? error.message : 'Could not check your upload. Please try again.')
+    } finally { setIsSubmitting(false) }
   }
 
   const openEditPanel = (video: VideoRow) => {
@@ -320,7 +361,6 @@ export default function VideosPage() {
       title: video.title,
       description: video.description,
       prompt: video.prompt ?? '',
-      generationSource: video.generation_source,
       competitionDate: isoStringToDateInput(video.unlock_at),
     })
     setLibraryError(null)
@@ -344,7 +384,6 @@ export default function VideosPage() {
       title: '',
       description: '',
       prompt: '',
-      generationSource: 'ai',
       competitionDate: defaultCompetitionDateValue(),
     })
   }
@@ -387,7 +426,6 @@ export default function VideosPage() {
           title: editForm.title,
           description: editForm.description,
           prompt: editForm.prompt || null,
-          generation_source: editForm.generationSource,
           unlock_at: unlockAtISO,
           updated_at: new Date().toISOString(),
         })
@@ -440,14 +478,14 @@ export default function VideosPage() {
     }
   }
 
-  const pollForFinalization = async (uploadId: string) => {
+  const pollForFinalization = async (uploadId: string, uploadTicket: string) => {
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const finalizeResponse = await fetch('/api/videos/finalize', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ uploadId }),
+        body: JSON.stringify({ uploadId, uploadTicket }),
       })
 
       const payload = await finalizeResponse.json()
@@ -461,20 +499,19 @@ export default function VideosPage() {
       }
 
       if (payload.status === 'errored') {
-        throw new Error(payload.error || 'MUX reported an error processing the upload.')
+        throw new Error(payload.error || 'We couldn’t process this video. Try exporting it as an MP4 and uploading again.')
       }
 
       await wait(attempt < 5 ? 3000 : 5000)
     }
 
-    throw new Error('MUX is still processing this upload. Please refresh in a moment.')
+    return null
   }
 
   const renderVideoCard = (video: VideoRow) => {
     const unlockDate = new Date(video.unlock_at)
     const now = new Date()
     const isUnlocked = unlockDate <= now
-    const playbackUrl = video.mux_playback_id ? `https://stream.mux.com/${video.mux_playback_id}.m3u8` : null
 
     return (
       <div
@@ -487,15 +524,6 @@ export default function VideosPage() {
             <p className="text-sm text-white/50">Uploaded {new Date(video.created_at).toLocaleString()}</p>
           </div>
           <div className="flex items-center gap-3">
-            <span
-              className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] ${
-                video.generation_source === 'ai'
-                  ? 'border-[#f5d67b]/25 bg-[#f5d67b]/5 text-[#f5d67b]/80'
-                  : 'border-white/15 bg-white/5 text-white/60'
-              }`}
-            >
-              {video.generation_source === 'ai' ? 'AI' : 'Human'}
-            </span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -542,25 +570,8 @@ export default function VideosPage() {
               {isUnlocked ? 'Competed' : 'Scheduled'}
             </p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs uppercase tracking-[0.4em] text-white/50">MUX Asset ID</p>
-            <p className="mt-2 text-white break-all">{video.mux_asset_id}</p>
-          </div>
         </div>
-
-        {playbackUrl && (
-          <div className="mt-4 text-sm">
-            <p className="text-xs uppercase tracking-[0.4em] text-white/50">Playback URL</p>
-            <a
-              href={playbackUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-1 inline-flex break-all text-[#f5d67b] hover:underline"
-            >
-              {playbackUrl}
-            </a>
-          </div>
-        )}
+        {video.mux_playback_id && <Link href={`/videos/${video.id}`} className="action-secondary">Watch your video ↗</Link>}
       </div>
     )
   }
@@ -574,7 +585,7 @@ export default function VideosPage() {
   }
 
   return (
-    <div className="relative isolate min-h-[calc(100vh-5rem)] px-6 py-16">
+    <div className="creator-workspace relative isolate min-h-[calc(100vh-5rem)] px-6 py-16">
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute right-6 top-0 h-72 w-72 rounded-full bg-[#f5d67b]/15 blur-[170px]" />
         <div className="absolute bottom-[-4rem] left-5 h-80 w-80 rounded-full bg-[#f0b90b]/10 blur-[190px]" />
@@ -585,9 +596,9 @@ export default function VideosPage() {
           <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.5em] text-[#f5d67b]">Submit your entry</p>
-              <h1 className="mt-2 text-3xl font-semibold text-white">Enter the daily competition</h1>
+              <h1 className="mt-2 text-3xl font-semibold text-white">Your next film starts here.</h1>
               <p className="text-white/60">
-                Upload your video, pick a competition date, and let the community decide if it&apos;s art or slop.
+                Upload your video, pick a competition date, and share your work with the community.
               </p>
             </div>
             <button
@@ -613,36 +624,6 @@ export default function VideosPage() {
                   className={fieldClass}
                   placeholder="My incredible launch video"
                 />
-              </div>
-
-              <div>
-                <label className="text-xs uppercase tracking-[0.4em] text-white/60">Generation</label>
-                <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl border border-white/15 bg-white/5 p-2">
-                  <button
-                    type="button"
-                    onClick={() => setForm((prev) => ({ ...prev, generationSource: 'ai' }))}
-                    aria-pressed={form.generationSource === 'ai'}
-                    className={`rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.3em] transition ${
-                      form.generationSource === 'ai'
-                        ? 'bg-[#f5d67b] text-black'
-                        : 'border border-white/15 bg-transparent text-white/70 hover:border-white/40 hover:text-white'
-                    }`}
-                  >
-                    AI generated
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setForm((prev) => ({ ...prev, generationSource: 'human' }))}
-                    aria-pressed={form.generationSource === 'human'}
-                    className={`rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.3em] transition ${
-                      form.generationSource === 'human'
-                        ? 'bg-[#f5d67b] text-black'
-                        : 'border border-white/15 bg-transparent text-white/70 hover:border-white/40 hover:text-white'
-                    }`}
-                  >
-                    Human generated
-                  </button>
-                </div>
               </div>
             </div>
 
@@ -781,7 +762,7 @@ export default function VideosPage() {
                     required
                   />
                   <p className="mt-2 text-xs text-white/40">
-                    Large files travel directly to MUX through a secure upload URL.
+                    Choose your finished video. Keep this tab open while it uploads.
                   </p>
                 </div>
               </div>
@@ -790,20 +771,22 @@ export default function VideosPage() {
             <SubmissionBrief date={form.competitionDate} />
 
             {error && (
-              <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+              <div role="alert" className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
                 {error}
               </div>
             )}
 
             {status && (
-              <div className="rounded-2xl border border-[#f5d67b]/30 bg-[#f5d67b]/10 px-4 py-3 text-sm text-[#f5d67b]">
+              <div role="status" className="rounded-2xl border border-[#f5d67b]/30 bg-[#f5d67b]/10 px-4 py-3 text-sm text-[#f5d67b]">
                 {status}
               </div>
             )}
 
+            {pendingUpload && <div className="upload-recovery"><h3>Your file has been uploaded.</h3><p>Finish processing and save your entry. You don’t need to select the file again.</p><button type="button" className="action-primary" disabled={isSubmitting} onClick={resumeUpload}>Check upload status</button><button type="button" className="action-secondary" disabled={isSubmitting} onClick={() => { if (window.confirm('Start over? This will discard the saved recovery receipt for this upload.')) { rememberUpload(null); setStatus(null); setError(null) } }}>Start over</button></div>}
+
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !!pendingUpload}
               className="inline-flex w-full items-center justify-center rounded-full border border-[#f5d67b] bg-[#f5d67b] px-6 py-3 text-sm font-semibold uppercase tracking-[0.45em] text-black transition hover:-translate-y-0.5 hover:bg-[#ffe8a0] disabled:cursor-not-allowed disabled:opacity-60 md:w-auto"
             >
               {isSubmitting ? 'Uploading...' : 'Upload video'}
@@ -879,36 +862,6 @@ export default function VideosPage() {
                       maxLength={120}
                       className={fieldClass}
                     />
-                  </div>
-
-                  <div>
-                    <label className="text-xs uppercase tracking-[0.4em] text-white/60">Generation</label>
-                    <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl border border-white/15 bg-white/5 p-2">
-                      <button
-                        type="button"
-                        onClick={() => setEditForm((prev) => ({ ...prev, generationSource: 'ai' }))}
-                        aria-pressed={editForm.generationSource === 'ai'}
-                        className={`rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.3em] transition ${
-                          editForm.generationSource === 'ai'
-                            ? 'bg-[#f5d67b] text-black'
-                            : 'border border-white/15 bg-transparent text-white/70 hover:border-white/40 hover:text-white'
-                        }`}
-                      >
-                        AI generated
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditForm((prev) => ({ ...prev, generationSource: 'human' }))}
-                        aria-pressed={editForm.generationSource === 'human'}
-                        className={`rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.3em] transition ${
-                          editForm.generationSource === 'human'
-                            ? 'bg-[#f5d67b] text-black'
-                            : 'border border-white/15 bg-transparent text-white/70 hover:border-white/40 hover:text-white'
-                        }`}
-                      >
-                        Human generated
-                      </button>
-                    </div>
                   </div>
                 </div>
 

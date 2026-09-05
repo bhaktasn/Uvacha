@@ -14,7 +14,6 @@ interface VideoCardProps {
   id: string
   title: string
   createdAt: string
-  generationSource: 'ai' | 'human'
   muxPlaybackId: string | null
   creatorUsername: string | null
   creatorAvatarUrl?: string | null
@@ -36,7 +35,6 @@ export function VideoCard({
   id,
   title,
   createdAt,
-  generationSource,
   muxPlaybackId,
   creatorUsername,
   creatorAvatarUrl,
@@ -119,9 +117,6 @@ export function VideoCard({
         ) : (
           <div className="aspect-video w-full bg-[radial-gradient(circle_at_top,_rgba(245,214,123,0.25),_transparent_55%)] transition duration-200 group-hover:scale-[1.02]" />
         )}
-        <span className="absolute bottom-3 left-3 rounded bg-black/65 px-2 py-1 text-[10px] font-medium tracking-widest text-white/85 backdrop-blur-sm">
-          {generationSource === 'ai' ? 'AI' : 'Human'}
-        </span>
         <span className="thumbnail-play" aria-hidden="true">{playing ? 'Ⅱ' : '▶'}</span>
         {playing && <span className="preview-caption" aria-hidden="true">Muted preview</span>}
       </Link>

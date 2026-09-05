@@ -305,7 +305,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="relative isolate min-h-[calc(100vh-5rem)] px-6 py-16">
+    <div className="creator-workspace relative isolate min-h-[calc(100vh-5rem)] px-6 py-16">
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute left-6 top-10 h-72 w-72 rounded-full bg-[#f5d67b]/15 blur-[170px]" />
         <div className="absolute bottom-0 right-10 h-64 w-64 rounded-full bg-[#f5b047]/15 blur-[160px]" />
@@ -314,10 +314,10 @@ export default function ProfilePage() {
       <div className="mx-auto max-w-3xl space-y-8">
         <div className="flex flex-col gap-4 rounded-[2rem] border border-white/10 bg-black/40 p-8 shadow-[0_25px_120px_rgba(0,0,0,0.55)] backdrop-blur-2xl sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.5em] text-[#f5d67b]">Control room</p>
-            <h1 className="mt-2 text-3xl font-semibold text-white">My profile</h1>
+            <p className="text-xs uppercase tracking-[0.5em] text-[#f5d67b]">Your creator profile</p>
+            <h1 className="mt-2 text-3xl font-semibold text-white">Make yourself known.</h1>
             <p className="text-sm text-white/60">
-              Wallets, socials, and account preferences in one luxe panel.
+              Introduce yourself, share your socials, and choose where to receive prizes.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
