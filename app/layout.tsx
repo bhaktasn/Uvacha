@@ -21,8 +21,8 @@ const geistMono = Geist_Mono({
 });
 
 const guestLinks = [
-  { href: "/signup", label: "Sign up", variant: "ghost" },
-  { href: "/login", label: "Sign in", variant: "primary" },
+  { href: "/login", label: "Sign in", variant: "ghost" },
+  { href: "/signup?next=%2Fvideos", label: "Submit a video", variant: "primary" },
 ] as const;
 
 const guestLinkBaseClasses =
@@ -39,19 +39,17 @@ export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_APP_URL ??
       process.env.NEXT_PUBLIC_SITE_URL ??
-      (process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : "http://localhost:3000")
+      "https://www.uvacha.ai"
   ),
   title: "Uvacha | Daily Video Competition",
   description:
-    "Daily AI video competitions to separate art from slop. Submit your best work, let the community decide, and win cash prizes in USDC.",
+    "Your AI film deserves an audience. Submit a video, get community ratings, and compete for daily cash prizes.",
   openGraph: {
     type: "website",
     siteName: "Uvacha",
     title: "Uvacha | Daily Video Competition",
     description:
-      "Daily AI video competitions to separate art from slop. Submit your best work, let the community decide, and win cash prizes in USDC.",
+      "Your AI film deserves an audience. Submit a video, get community ratings, and compete for daily cash prizes.",
     url: "/",
     images: [
       {
@@ -66,8 +64,8 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Uvacha | Daily Video Competition",
     description:
-      "Daily AI video competitions to separate art from slop. Submit your best work, let the community decide, and win cash prizes in USDC.",
-    images: ["/opengraph-image"],
+      "Your AI film deserves an audience. Submit a video, get community ratings, and compete for daily cash prizes.",
+    images: ["/opengraph-image?v=2"],
   },
 };
 
@@ -132,10 +130,10 @@ export default async function RootLayout({
                   <>
                     {/* Mobile: Only show Sign in button */}
                     <Link
-                      href="/login"
+                      href="/signup?next=%2Fvideos"
                       className={`inline-flex sm:hidden ${guestLinkBaseClasses} ${guestLinkVariants.primary}`}
                     >
-                      Sign in
+                      Submit
                     </Link>
                     {/* Desktop: Show both buttons */}
                     {guestLinks.map(({ href, label, variant }) => (
@@ -156,6 +154,13 @@ export default async function RootLayout({
           <main className="relative flex-1">
             <Web3Provider>{children}</Web3Provider>
           </main>
+          <footer className="site-socials">
+            <div><span className="eyebrow">Beyond the screening room</span><p>Follow Uvacha.</p></div>
+            <nav aria-label="Uvacha social accounts">
+              <a href="https://x.com/Uvacha_ai" target="_blank" rel="noopener noreferrer" aria-label="Uvacha on X (opens in a new tab)"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3L12 14.5 5.4 22H2.2l8.3-9.5L.8 2h6.5l5.8 7.6L18.9 2Zm-1.1 18h1.7L6.3 3.9H4.5L17.8 20Z" /></svg><span>@Uvacha_ai</span><span aria-hidden="true">↗</span></a>
+              <a href="https://www.youtube.com/channel/UCi_vEvJyfRkTiLqcTmeNEeg" target="_blank" rel="noopener noreferrer" aria-label="Uvacha on YouTube (opens in a new tab)"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23 7s-.2-1.7-.9-2.4c-.9-.9-1.9-.9-2.3-1C16.6 3.4 12 3.4 12 3.4s-4.6 0-7.8.2c-.4.1-1.4.1-2.3 1C1.2 5.3 1 7 1 7S.8 9 .8 11v2c0 2 .2 4 .2 4s.2 1.7.9 2.4c.9.9 2.1.9 2.6 1 1.8.2 7.5.2 7.5.2s4.6 0 7.8-.3c.4 0 1.4 0 2.3-.9.7-.7.9-2.4.9-2.4s.2-2 .2-4v-2c0-2-.2-4-.2-4ZM9.7 15.5v-7l6 3.5-6 3.5Z" /></svg><span>YouTube</span><span aria-hidden="true">↗</span></a>
+            </nav>
+          </footer>
         </div>
       </body>
     </html>

@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { authDestination } from '@/lib/auth-destination'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -47,16 +48,17 @@ export async function updateSession(request: NextRequest) {
   if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    url.searchParams.set('next', authDestination(path))
     return NextResponse.redirect(url)
   }
 
   // Redirect authenticated users away from auth pages
   if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')) {
     const url = request.nextUrl.clone()
-    url.pathname = '/profile'
+    url.pathname = authDestination(request.nextUrl.searchParams.get('next'))
+    url.search = ''
     return NextResponse.redirect(url)
   }
 
   return supabaseResponse
 }
-

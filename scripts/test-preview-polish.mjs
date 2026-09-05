@@ -1,0 +1,48 @@
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+const base = 'http://127.0.0.1:3000';
+try {
+  await page.goto(base, { waitUntil: 'networkidle' });
+  assert.match(await page.locator('.prize-film-frame').innerText(), /\$5/);
+  assert.equal(await page.locator('.site-socials a').first().getAttribute('href'), 'https://x.com/Uvacha_ai');
+  assert.equal(await page.locator('.site-socials a').last().getAttribute('href'), 'https://www.youtube.com/channel/UCi_vEvJyfRkTiLqcTmeNEeg');
+  await page.screenshot({ path: '/tmp/uvacha-prize-frame.png', fullPage: true });
+  const thumbnail = page.locator('.video-thumbnail').first();
+  assert.equal(await page.locator('mux-player').count(), 0, 'Players should load only on hover');
+  await thumbnail.hover();
+  await page.locator('.hover-preview.is-playing').waitFor({ timeout: 30000 });
+  const player = page.locator('.hover-preview mux-player');
+  assert.equal(await player.evaluate(element => element.muted), true);
+  const before = await player.evaluate(element => element.currentTime);
+  await page.waitForFunction(time => document.querySelector('.hover-preview mux-player')?.currentTime > time + .3, before);
+  await page.screenshot({ path: '/tmp/uvacha-hover-preview.png', fullPage: true });
+  await page.mouse.move(0, 0);
+  await page.waitForFunction(() => !document.querySelector('.hover-preview'));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await thumbnail.hover();
+  await page.waitForTimeout(350);
+  assert.equal(await page.locator('.hover-preview').count(), 0);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(base, { waitUntil: 'networkidle' });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.screenshot({ path: '/tmp/uvacha-prize-frame-mobile.png', fullPage: true });
+  await page.goto(`${base}/admin`, { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: '+ Add week' }).click();
+  await page.getByLabel('Starts (UTC)').last().fill('2026-10-26');
+  await page.getByLabel('Theme title').last().fill('The house is not empty');
+  await page.getByLabel('Creative brief').last().fill('Make a horror short set in a haunted house.');
+  await page.getByLabel('Competition date', { exact: true }).fill('2026-10-28');
+  const brief = page.locator('.schedule-preview .submission-brief');
+  assert.match(await brief.innerText(), /Themed competition/i);
+  assert.match(await brief.innerText(), /Make a horror short set in a haunted house/);
+  assert.match(await brief.innerText(), /2026-10-26 through 2026-11-01/);
+  assert.match(await brief.innerText(), /2026-10-28/);
+  await page.screenshot({ path: '/tmp/uvacha-upload-brief.png', fullPage: true });
+  await page.getByLabel('Competition date', { exact: true }).fill('2026-11-02');
+  assert.match(await brief.innerText(), /There is no scheduled theme/);
+  // No schedule is saved; the sample exists only in this browser's draft.
+  console.log('Passed: prize frame, social URLs, actual muted playback/time advancement, hover exit, reduced motion, mobile overflow, themed and open-date uploader brief.');
+} finally { await browser.close(); }
