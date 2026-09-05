@@ -9,7 +9,7 @@ type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 
 type SearchResult = Pick<
   VideoRow,
-  "id" | "title" | "description" | "created_at" | "generation_source" | "mux_playback_id"
+  "id" | "title" | "description" | "created_at" | "mux_playback_id"
 > & {
   profiles: Pick<ProfileRow, "username" | "avatar_url"> | null;
 };
@@ -35,7 +35,7 @@ async function searchVideos(query: string): Promise<SearchResult[]> {
   const videoSearchPromise = supabase
     .from("videos")
     .select(
-      "id,title,description,created_at,generation_source,mux_playback_id,profiles:profiles!videos_profile_id_fkey(username,avatar_url)",
+      "id,title,description,created_at,mux_playback_id,profiles:profiles!videos_profile_id_fkey(username,avatar_url)",
     )
     .lte("unlock_at", now)
     .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
@@ -64,7 +64,7 @@ async function searchVideos(query: string): Promise<SearchResult[]> {
     const { data: profileVideos, error: profileVideosError } = await supabase
       .from("videos")
       .select(
-        "id,title,description,created_at,generation_source,mux_playback_id,profiles:profiles!videos_profile_id_fkey(username,avatar_url)",
+        "id,title,description,created_at,mux_playback_id,profiles:profiles!videos_profile_id_fkey(username,avatar_url)",
       )
       .lte("unlock_at", now)
       .in("profile_id", profileIds)
@@ -185,7 +185,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                     title={video.title}
                     description={video.description}
                     createdAt={video.created_at}
-                    generationSource={video.generation_source}
                     muxPlaybackId={video.mux_playback_id}
                     creatorUsername={video.profiles?.username ?? null}
                     creatorAvatarUrl={video.profiles?.avatar_url}
@@ -204,4 +203,3 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     </div>
   );
 }
-

@@ -48,7 +48,7 @@ async function fetchVideo(videoId: string): Promise<VideoWithProfile | null> {
     const { data, error } = await supabase
       .from("videos")
       .select(
-        "id,profile_id,title,description,prompt,generation_source,mux_asset_id,mux_playback_id,view_count,unlock_at,created_at,profiles:profiles!videos_profile_id_fkey(username,usdc_wallet_address,avatar_url)"
+        "id,profile_id,title,description,prompt,mux_asset_id,mux_playback_id,view_count,unlock_at,created_at,profiles:profiles!videos_profile_id_fkey(username,usdc_wallet_address,avatar_url)"
       )
       .eq("id", videoId)
       .maybeSingle();
@@ -173,9 +173,6 @@ export default async function VideoDetailPage({ params }: VideoPageProps) {
               </div>
 
               <div className="mt-4 flex flex-wrap gap-3 text-sm">
-                <span className="rounded-full border border-white/10 px-4 py-1 text-white/60">
-                  {video.generation_source === "ai" ? "AI generated" : "Human made"}
-                </span>
                 <span className={`rounded-full border px-4 py-1 font-semibold ${
                   hasCompeted
                     ? "border-white/15 bg-white/5 text-white/60"
@@ -267,4 +264,3 @@ export default async function VideoDetailPage({ params }: VideoPageProps) {
     </div>
   );
 }
-

@@ -58,7 +58,6 @@ export interface Database {
           title: string
           description: string
           prompt: string | null
-          generation_source: 'ai' | 'human'
           mux_asset_id: string
           mux_playback_id: string | null
           view_count: number
@@ -72,7 +71,6 @@ export interface Database {
           title: string
           description: string
           prompt?: string | null
-          generation_source?: 'ai' | 'human'
           mux_asset_id: string
           mux_playback_id?: string | null
           view_count?: number
@@ -86,7 +84,6 @@ export interface Database {
           title?: string
           description?: string
           prompt?: string | null
-          generation_source?: 'ai' | 'human'
           mux_asset_id?: string
           mux_playback_id?: string | null
           view_count?: number
@@ -238,4 +235,3 @@ export interface Database {
     CompositeTypes: {}
   }
 }
-

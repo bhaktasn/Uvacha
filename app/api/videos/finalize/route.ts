@@ -2,13 +2,13 @@ import { NextResponse } from 'next/server'
 
 import { getMuxVideoClient } from '@/lib/mux/client'
 import { createClient } from '@/lib/supabase/server'
+import { readUploadTicket, validateUploadMetadata } from '@/lib/upload-metadata'
 
 interface PassthroughPayload {
   profileId: string
   title: string
   description: string
   prompt: string | null
-  generationSource: 'ai' | 'human'
   unlockAt: string
 }
 const DUPLICATE_COMPETITION_DAY_ERROR = 'You already have a video competing on this date. Choose a different competition day.'
@@ -22,7 +22,6 @@ function parsePassthrough(value?: string | null): PassthroughPayload | null {
       title: parsed.title,
       description: parsed.description,
       prompt: parsed.prompt ?? null,
-      generationSource: parsed.generationSource === 'ai' ? 'ai' : 'human',
       unlockAt: parsed.unlockAt,
     }
   } catch {
@@ -32,7 +31,7 @@ function parsePassthrough(value?: string | null): PassthroughPayload | null {
 
 export async function POST(req: Request) {
   try {
-    const { uploadId } = await req.json()
+    const { uploadId, uploadTicket } = await req.json()
 
     if (!uploadId || typeof uploadId !== 'string') {
       return NextResponse.json({ error: 'uploadId is required' }, { status: 400 })
@@ -61,11 +60,19 @@ export async function POST(req: Request) {
     }
 
     if (upload.status === 'errored') {
-      return NextResponse.json({ status: 'errored', error: upload.error?.message ?? 'Upload failed' }, { status: 400 })
+      console.error('Video transfer failed', upload.error)
+      return NextResponse.json({ status: 'errored', error: 'The video transfer could not be completed. Try uploading your file again.' }, { status: 400 })
     }
 
     const passthroughRaw = upload.new_asset_settings?.passthrough ?? null
-    const passthrough = parsePassthrough(passthroughRaw)
+    let passthrough: PassthroughPayload | null
+    try {
+      passthrough = typeof uploadTicket === 'string'
+        ? readUploadTicket(uploadTicket, uploadId, user.id, process.env.MUX_TOKEN_SECRET!)
+        : validateUploadMetadata(parsePassthrough(passthroughRaw))
+    } catch {
+      return NextResponse.json({ error: 'We could not verify this upload. Return to the upload tab and try checking its status again.' }, { status: 400 })
+    }
 
     if (!passthrough || passthrough.profileId !== user.id) {
       return NextResponse.json({ error: 'Upload metadata missing or does not match user' }, { status: 403 })
@@ -81,6 +88,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Asset not found yet' }, { status: 404 })
     }
 
+    if (asset.status === 'errored') {
+      return NextResponse.json({ status: 'errored', error: 'This video could not be processed. Try exporting it as an MP4 and uploading again.' }, { status: 400 })
+    }
     if (asset.status !== 'ready') {
       return NextResponse.json({ status: asset.status ?? 'processing' })
     }
@@ -114,6 +124,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: DUPLICATE_COMPETITION_DAY_ERROR }, { status: 409 })
     }
 
+    // Returning creators may predate automatic profile creation.
+    if (user.email) {
+      const { error: profileError } = await supabase.from('profiles').upsert({ id: user.id, email: user.email }, { onConflict: 'id', ignoreDuplicates: true })
+      if (profileError) {
+        console.error('Unable to prepare creator profile', profileError.code)
+        return NextResponse.json({ error: 'Your file uploaded, but we could not prepare your creator profile. Please try checking its status again.' }, { status: 500 })
+      }
+    }
+
     const { data, error } = await supabase
       .from('videos')
       .insert({
@@ -121,7 +140,6 @@ export async function POST(req: Request) {
         title: passthrough.title,
         description: passthrough.description,
         prompt: passthrough.prompt,
-        generation_source: passthrough.generationSource,
         mux_asset_id: asset.id,
         mux_playback_id: playbackId,
         unlock_at: passthrough.unlockAt ?? new Date().toISOString(),
@@ -140,5 +158,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Failed to finalize upload' }, { status: 500 })
   }
 }
-
-

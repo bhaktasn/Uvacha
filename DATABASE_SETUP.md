@@ -95,8 +95,6 @@ CREATE TABLE videos (
   prompt TEXT CHECK (prompt IS NULL OR char_length(prompt) <= 10000),
   
   -- Track whether the video was made by AI or a human
-  generation_source TEXT NOT NULL DEFAULT 'human'
-    CHECK (generation_source IN ('ai', 'human')),
   
   -- MUX asset ids so we can create playback sessions
   mux_asset_id TEXT NOT NULL,
@@ -357,7 +355,6 @@ COMMENT ON COLUMN profiles.instagram_handle IS 'Instagram handle without @ symbo
 COMMENT ON TABLE videos IS 'MUX-hosted video metadata with release windows';
 COMMENT ON COLUMN videos.profile_id IS 'Owner of the video; references profiles.id/auth.uid()';
 COMMENT ON COLUMN videos.prompt IS 'Optional AI generation prompt shared by the creator (up to 10k chars)';
-COMMENT ON COLUMN videos.generation_source IS 'Whether the video was AI or human generated';
 COMMENT ON COLUMN videos.mux_asset_id IS 'MUX asset ID returned after an upload';
 COMMENT ON COLUMN videos.mux_playback_id IS 'MUX playback ID used for streaming';
 COMMENT ON COLUMN videos.view_count IS 'Aggregate view counter surfaced in the UI';
@@ -395,7 +392,6 @@ COMMENT ON COLUMN video_ratings.rating IS 'Whole-number score between 1 (Slop) a
    - title (text)
    - description (text)
    - prompt (text, nullable, max 10000 chars)
-   - generation_source (text, constrained to `ai` or `human`)
    - mux_asset_id (text)
    - mux_playback_id (text, nullable)
    - view_count (bigint, default 0)
@@ -558,7 +554,6 @@ SELECT
   v.id,
   v.title,
   v.description,
-  v.generation_source,
   v.mux_playback_id,
   v.unlock_at,
   p.twitter_handle AS creator_twitter
@@ -625,7 +620,6 @@ required beyond adding the column—existing rows default to `0` views.
 | `title` | TEXT | No | Required video title (3–120 chars). |
 | `description` | TEXT | No | Long-form description (up to ~5k chars). |
 | `prompt` | TEXT | Yes | Optional AI generation prompt (up to 10k chars). Creators can share the prompts used to generate their AI videos. |
-| `generation_source` | TEXT | No | `ai` or `human`, allowing uploaders to flag how the video was produced. |
 | `mux_asset_id` | TEXT | No | Required ID returned by MUX after upload/ingest. |
 | `mux_playback_id` | TEXT | Yes | Optional playback ID used to request streaming URLs from MUX. |
 | `view_count` | BIGINT | No | Aggregated total of how many times the video detail page has been viewed. |
@@ -750,4 +744,3 @@ If you encounter issues:
 ---
 
 Last updated: January 2026
-

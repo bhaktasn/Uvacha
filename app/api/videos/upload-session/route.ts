@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server'
 
 import { getMuxVideoClient } from '@/lib/mux/client'
 import { createClient } from '@/lib/supabase/server'
+import { createUploadTicket } from '@/lib/upload-metadata'
 
 const TITLE_MIN = 3
 const TITLE_MAX = 120
 const DESCRIPTION_MAX = 5000
 const PROMPT_MAX = 10000
-const GENERATION_SOURCES = new Set(['ai', 'human'])
 const DUPLICATE_COMPETITION_DAY_ERROR = 'You already have a video competing on this date. Choose a different competition day.'
 
 export async function POST(req: Request) {
@@ -31,7 +31,6 @@ export async function POST(req: Request) {
     const title: string = (body?.title ?? '').trim()
     const description: string = (body?.description ?? '').trim()
     const prompt: string | null = body?.prompt ? String(body.prompt).trim() : null
-    const rawGenerationSource: string = (body?.generationSource ?? 'ai').toLowerCase()
     const unlockAtInput: string | undefined = body?.unlockAt
 
     if (title.length < TITLE_MIN || title.length > TITLE_MAX) {
@@ -46,10 +45,6 @@ export async function POST(req: Request) {
         { error: `Description is required and must be under ${DESCRIPTION_MAX} characters.` },
         { status: 400 }
       )
-    }
-
-    if (!GENERATION_SOURCES.has(rawGenerationSource)) {
-      return NextResponse.json({ error: 'generationSource must be either "ai" or "human".' }, { status: 400 })
     }
 
     if (prompt && prompt.length > PROMPT_MAX) {
@@ -91,11 +86,12 @@ export async function POST(req: Request) {
       title,
       description,
       prompt,
-      generationSource: rawGenerationSource,
       unlockAt: unlockAtIso,
     }
 
-    const passthrough = JSON.stringify(passthroughPayload)
+    // Mux passthrough has a 255-character limit. Keep long text in a signed
+    // receipt returned to this browser, bound to the owner and upload ID.
+    const passthrough = JSON.stringify({ profileId: user.id, version: 2 })
 
     const upload = await muxVideo.uploads.create({
       cors_origin: corsOrigin,
@@ -108,11 +104,10 @@ export async function POST(req: Request) {
     return NextResponse.json({
       uploadUrl: upload.url,
       uploadId: upload.id,
+      uploadTicket: createUploadTicket(upload.id, passthroughPayload, process.env.MUX_TOKEN_SECRET!),
     })
   } catch (error) {
     console.error('Failed to create MUX upload session', error)
     return NextResponse.json({ error: 'Failed to create upload session' }, { status: 500 })
   }
 }
-
-
