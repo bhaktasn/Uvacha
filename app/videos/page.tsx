@@ -11,6 +11,13 @@ import { competitionToday } from '@/lib/competition'
 
 type VideoRow = Database['public']['Tables']['videos']['Row']
 type PendingUpload = { uploadId: string; uploadTicket: string }
+type UploadStage = 'creating' | 'uploading' | 'processing'
+
+const UPLOAD_STEPS: { id: UploadStage; label: string }[] = [
+  { id: 'creating', label: 'Getting ready' },
+  { id: 'uploading', label: 'Uploading file' },
+  { id: 'processing', label: 'Preparing film' },
+]
 
 const defaultCompetitionDateValue = () => {
   return competitionToday()
@@ -63,8 +70,75 @@ const isDateBeforeToday = (value: string) => {
 
 const WEEKDAY_HEADERS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const DUPLICATE_COMPETITION_DAY_ERROR = 'You already have a video competing on this date. Choose a different competition day.'
+const UPLOAD_DRAFT_KEY = 'uvacha-upload-form-draft'
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const uploadFile = (url: string, file: File, onProgress: (percentage: number) => void) =>
+  new Promise<void>((resolve, reject) => {
+    const request = new XMLHttpRequest()
+    request.open('PUT', url)
+    request.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+    request.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) {
+        onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)))
+      }
+    })
+    request.addEventListener('load', () => {
+      if (request.status >= 200 && request.status < 300) {
+        onProgress(100)
+        resolve()
+      } else {
+        reject(new Error('The video transfer failed. Check your connection and try again.'))
+      }
+    })
+    request.addEventListener('error', () => reject(new TypeError('Network request failed')))
+    request.addEventListener('abort', () => reject(new Error('The upload was cancelled.')))
+    request.send(file)
+  })
+
+function UploadProgress({ stage, transferProgress, processingAttempt, fileName }: {
+  stage: UploadStage
+  transferProgress: number
+  processingAttempt: number
+  fileName: string
+}) {
+  const currentStep = UPLOAD_STEPS.findIndex((step) => step.id === stage)
+  const overallProgress = stage === 'creating'
+    ? 5
+    : stage === 'uploading'
+      ? 10 + Math.round(transferProgress * 0.75)
+      : Math.min(98, 90 + Math.floor(processingAttempt / 3))
+  const stageCopy = stage === 'creating'
+    ? 'Opening a secure connection…'
+    : stage === 'uploading'
+      ? `${transferProgress}% of your file transferred`
+      : 'Your upload is complete. We’re preparing it for playback…'
+
+  return (
+    <section className="upload-progress-panel" aria-labelledby="upload-progress-title" aria-busy="true">
+      <div className="upload-progress-orbit" aria-hidden="true"><span /></div>
+      <p className="eyebrow">Submission in progress</p>
+      <h2 id="upload-progress-title">Keep this tab open.</h2>
+      <p className="upload-progress-file">{fileName}</p>
+
+      <div className="upload-progress-track" role="progressbar" aria-label="Upload progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={overallProgress}>
+        <span style={{ width: `${overallProgress}%` }} />
+      </div>
+      <div className="upload-progress-readout" role="status" aria-live="polite">
+        <span>{stageCopy}</span><strong>{overallProgress}%</strong>
+      </div>
+
+      <ol className="upload-progress-steps" aria-label="Upload stages">
+        {UPLOAD_STEPS.map((step, index) => {
+          const state = index < currentStep ? 'complete' : index === currentStep ? 'active' : 'waiting'
+          return <li key={step.id} data-state={state}><span>{state === 'complete' ? '✓' : index + 1}</span>{step.label}</li>
+        })}
+      </ol>
+      <p className="upload-progress-note">Large files and playback preparation can take a few minutes. You’ll be taken to a confirmation screen when it’s done.</p>
+    </section>
+  )
+}
 
 const isoStringToDateInput = (isoString: string) => {
   if (!isoString) {
@@ -96,6 +170,9 @@ export default function VideosPage() {
   const [status, setStatus] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [uploadStage, setUploadStage] = useState<UploadStage | null>(null)
+  const [transferProgress, setTransferProgress] = useState(0)
+  const [processingAttempt, setProcessingAttempt] = useState(0)
   const [pendingUpload, setPendingUpload] = useState<PendingUpload | null>(null)
   const recoveryKey = useRef<string | null>(null)
   const rememberUpload = (pending: PendingUpload | null) => {
@@ -192,6 +269,12 @@ export default function VideosPage() {
         const saved = JSON.parse(localStorage.getItem(recoveryKey.current) ?? 'null')
         if (typeof saved?.uploadId === 'string' && typeof saved?.uploadTicket === 'string') setPendingUpload(saved)
       } catch { /* Ignore unavailable storage or an invalid old receipt. */ }
+      try {
+        const draft = JSON.parse(sessionStorage.getItem(UPLOAD_DRAFT_KEY) ?? 'null')
+        if (draft && typeof draft.title === 'string' && typeof draft.description === 'string' && typeof draft.prompt === 'string' && typeof draft.competitionDate === 'string') {
+          setForm(draft)
+        }
+      } catch { /* The retry still works when session storage is unavailable. */ }
       await loadVideos()
       setInitialized(true)
     }
@@ -214,6 +297,16 @@ export default function VideosPage() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showCalendar])
+
+  useEffect(() => {
+    if (!isSubmitting) return undefined
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warnBeforeLeaving)
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving)
+  }, [isSubmitting])
 
   useEffect(() => {
     const parsed = parseDateValue(form.competitionDate)
@@ -276,6 +369,9 @@ export default function VideosPage() {
     }
 
     setIsSubmitting(true)
+    setUploadStage('creating')
+    setTransferProgress(0)
+    setProcessingAttempt(0)
     try {
       setStatus('Creating upload session…')
       const normalizedCompetitionDate =
@@ -301,39 +397,34 @@ export default function VideosPage() {
         throw new Error(sessionPayload.error || 'Failed to create upload session.')
       }
 
-      setStatus('Uploading your video…')
-      const uploadResponse = await fetch(sessionPayload.uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': file.type || 'application/octet-stream',
-        },
-        body: file,
-      })
-
-      if (!uploadResponse.ok) {
-        throw new Error('The video transfer failed. Check your connection and try again.')
-      }
+      setUploadStage('uploading')
+      await uploadFile(sessionPayload.uploadUrl, file, setTransferProgress)
 
       setStatus('Preparing your video for playback…')
+      setUploadStage('processing')
       const pending = { uploadId: sessionPayload.uploadId, uploadTicket: sessionPayload.uploadTicket }
       rememberUpload(pending)
-      const finalizedVideo = await pollForFinalization(pending.uploadId, pending.uploadTicket)
+      const finalizedVideo = await pollForFinalization(pending.uploadId, pending.uploadTicket, setProcessingAttempt)
 
       if (!finalizedVideo) {
-        setStatus('Your file uploaded and is still processing. You can check its status below without uploading it again.')
+        router.push('/videos/upload/success?processing=1')
         return
       }
       rememberUpload(null)
 
       setVideos((prev) => (finalizedVideo ? [finalizedVideo, ...prev] : prev))
-      setStatus('Video uploaded! It will enter the competition on your chosen date.')
       resetForm()
+      try { sessionStorage.removeItem(UPLOAD_DRAFT_KEY) } catch { /* Nothing to clean up. */ }
+      router.push(`/videos/upload/success?videoId=${encodeURIComponent(finalizedVideo.id)}&date=${encodeURIComponent(normalizedCompetitionDate)}`)
     } catch (err) {
       console.error(err)
       setStatus(null)
-      setError(err instanceof TypeError ? 'Could not connect to the upload service. Check your connection and try again.' : err instanceof Error ? err.message : 'Upload failed. Please try again.')
+      const message = err instanceof TypeError ? 'Could not connect to the upload service. Check your connection and try again.' : err instanceof Error ? err.message : 'Upload failed. Please try again.'
+      try { sessionStorage.setItem(UPLOAD_DRAFT_KEY, JSON.stringify(form)) } catch { /* Continue to the error screen. */ }
+      router.push(`/videos/upload/error?message=${encodeURIComponent(message)}`)
     } finally {
       setIsSubmitting(false)
+      setUploadStage(null)
     }
   }
 
@@ -351,7 +442,8 @@ export default function VideosPage() {
       setStatus('Your video is ready and entered for its competition date.')
     } catch (error) {
       setStatus(null)
-      setError(error instanceof Error ? error.message : 'Could not check your upload. Please try again.')
+      const message = error instanceof Error ? error.message : 'Could not check your upload. Please try again.'
+      router.push(`/videos/upload/error?message=${encodeURIComponent(message)}`)
     } finally { setIsSubmitting(false) }
   }
 
@@ -478,8 +570,9 @@ export default function VideosPage() {
     }
   }
 
-  const pollForFinalization = async (uploadId: string, uploadTicket: string) => {
+  const pollForFinalization = async (uploadId: string, uploadTicket: string, onAttempt?: (attempt: number) => void) => {
     for (let attempt = 0; attempt < 20; attempt += 1) {
+      onAttempt?.(attempt + 1)
       const finalizeResponse = await fetch('/api/videos/finalize', {
         method: 'POST',
         headers: {
@@ -609,7 +702,9 @@ export default function VideosPage() {
             </button>
           </div>
 
-          <form onSubmit={handleUpload} className="space-y-8">
+          {isSubmitting && uploadStage ? (
+            <UploadProgress stage={uploadStage} transferProgress={transferProgress} processingAttempt={processingAttempt} fileName={file?.name ?? 'Your video'} />
+          ) : <form onSubmit={handleUpload} className="space-y-8">
             <div className="grid gap-6 md:grid-cols-2">
               <div>
                 <label className="text-xs uppercase tracking-[0.4em] text-white/60">Title</label>
@@ -791,7 +886,7 @@ export default function VideosPage() {
             >
               {isSubmitting ? 'Uploading...' : 'Upload video'}
             </button>
-          </form>
+          </form>}
         </div>
 
         <div className="rounded-[2.5rem] border border-white/10 bg-black/50 p-10 shadow-[0_20px_120px_rgba(0,0,0,0.55)] backdrop-blur-2xl">
