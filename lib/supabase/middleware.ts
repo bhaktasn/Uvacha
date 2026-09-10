@@ -41,9 +41,12 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname
   const isVideoRoute = path.startsWith('/videos')
   const isVideoDetailRoute = /^\/videos\/[^/]+$/.test(path)
+  // Outcome screens contain no private account data and must remain reachable if
+  // an upload failure was caused by an expired session.
+  const isUploadOutcomeRoute = path === '/videos/upload/success' || path === '/videos/upload/error'
 
   const isProtectedRoute =
-    protectedPrefixes.some((prefix) => path.startsWith(prefix)) || (isVideoRoute && !isVideoDetailRoute)
+    protectedPrefixes.some((prefix) => path.startsWith(prefix)) || (isVideoRoute && !isVideoDetailRoute && !isUploadOutcomeRoute)
 
   if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone()
